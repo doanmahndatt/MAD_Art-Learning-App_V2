@@ -24,6 +24,7 @@ model User {
   tutorial_reviews  TutorialReview[]
   artwork_likes     ArtworkLike[]
   artwork_comments  ArtworkComment[]
+  tutorial_comments TutorialComment[]   // Thêm quan hệ
   notifications_received Notification[]  @relation("receiver")
   notifications_acted   Notification[]  @relation("actor")
 }
@@ -44,6 +45,7 @@ model Tutorial {
   materials         Material[]
   favorites         TutorialFavorite[]
   reviews           TutorialReview[]
+  comments          TutorialComment[]   // Thêm quan hệ
 }
 
 model TutorialStep {
@@ -90,6 +92,17 @@ model TutorialReview {
   tutorial          Tutorial            @relation(fields: [tutorial_id], references: [id], onDelete: Cascade)
   user              User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   @@unique([tutorial_id, user_id])
+}
+
+model TutorialComment {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorial_id       String              @db.Uuid
+  user_id           String              @db.Uuid
+  content           String
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now())
+  tutorial          Tutorial            @relation(fields: [tutorial_id], references: [id], onDelete: Cascade)
+  user              User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 model Artwork {

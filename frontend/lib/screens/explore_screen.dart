@@ -97,7 +97,21 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavBar(currentIndex: 3, onTap: (index) {}),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: 3, // Explore là index 3
+        onTap: (index) {
+          if (index == 3) return;
+          if (index == 0) {
+            Navigator.pushReplacementNamed(context, '/');
+          } else if (index == 1) {
+            Navigator.pushReplacementNamed(context, '/tutorials');
+          } else if (index == 2) {
+            Navigator.pushReplacementNamed(context, '/art_draw');
+          } else if (index == 4) {
+            Navigator.pushReplacementNamed(context, '/profile');
+          }
+        },
+      ),
     );
   }
 }

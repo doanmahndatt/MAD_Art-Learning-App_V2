@@ -63,4 +63,11 @@ constructor(private prisma: PrismaService) {}
       return { favorited: true };
     }
   }
+    async getComments(tutorialId: string) {
+      return this.prisma.tutorialComment.findMany({
+        where: { tutorial_id: tutorialId },
+        include: { user: true },
+        orderBy: { created_at: 'desc' },
+      });
+    }
 }

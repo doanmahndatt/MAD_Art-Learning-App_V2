@@ -5,6 +5,7 @@ import 'providers/auth_provider.dart';
 import 'services/notification_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/tutorials_screen.dart';
 import 'screens/tutorial_detail_screen.dart';
 import 'screens/art_draw_screen.dart';
 import 'screens/explore_screen.dart';
@@ -42,6 +43,7 @@ class MyApp extends StatelessWidget {
             builder: (_, auth, __) => auth.isAuthenticated ? const HomeScreen() : const LoginScreen(),
           ),
           '/home': (context) => const HomeScreen(),
+          '/tutorials': (context) => const TutorialsScreen(),
           '/tutorial_detail': (context) {
             final args = ModalRoute.of(context)!.settings.arguments as String;
             return TutorialDetailScreen(tutorialId: args);

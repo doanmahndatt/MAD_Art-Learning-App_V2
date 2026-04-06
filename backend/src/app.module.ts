@@ -7,6 +7,7 @@ import { ArtworksModule } from './artworks/artworks.module';
 import { CommentsModule } from './comments/comments.module';
 import { LikesModule } from './likes/likes.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { TutorialCommentsModule } from './tutorial-comments/tutorial-comments.module';
 import { PrismaService } from './prisma/prisma.service';
 
 @Module({
@@ -19,6 +20,7 @@ ConfigModule.forRoot({ isGlobal: true }),
     CommentsModule,
     LikesModule,
     NotificationsModule,
+    TutorialCommentsModule,
   ],
   providers: [PrismaService],
 })

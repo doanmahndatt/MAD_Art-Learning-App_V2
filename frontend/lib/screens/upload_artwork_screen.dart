@@ -17,7 +17,6 @@ class _UploadArtworkScreenState extends State<UploadArtworkScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _hashtagController = TextEditingController();
   File? _imageFile;
   bool _isPublic = true;
   bool _loading = false;
@@ -40,12 +39,8 @@ class _UploadArtworkScreenState extends State<UploadArtworkScreen> {
 
     setState(() => _loading = true);
 
-    // Chuyển ảnh sang base64 (tạm thời, nên dùng multipart trong thực tế)
-    String base64Image = '';
-    if (_imageFile != null) {
-      List<int> imageBytes = await _imageFile!.readAsBytes();
-      base64Image = 'data:image/png;base64,${base64Encode(imageBytes)}';
-    }
+    List<int> imageBytes = await _imageFile!.readAsBytes();
+    String base64Image = 'data:image/png;base64,${base64Encode(imageBytes)}';
 
     try {
       final res = await _api.post('/artworks', {
@@ -75,6 +70,10 @@ class _UploadArtworkScreenState extends State<UploadArtworkScreen> {
         title: const Text('Đăng tác phẩm mới'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -119,11 +118,6 @@ class _UploadArtworkScreenState extends State<UploadArtworkScreen> {
                 controller: _descriptionController,
                 decoration: const InputDecoration(labelText: 'Mô tả'),
                 maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _hashtagController,
-                decoration: const InputDecoration(labelText: 'Hashtag (cách nhau bằng dấu cách)'),
               ),
               const SizedBox(height: 16),
               SwitchListTile(

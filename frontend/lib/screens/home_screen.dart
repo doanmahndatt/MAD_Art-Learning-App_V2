@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import '../models/tutorial.dart';
-import '../widgets/tutorial_card.dart';
+import '../models/artwork.dart';
+import '../widgets/artwork_card.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../utils/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'tutorial_detail_screen.dart';
+import 'artwork_detail_screen.dart';
+import 'tutorials_screen.dart';
 import 'art_draw_screen.dart';
 import 'explore_screen.dart';
 import 'profile_screen.dart';
@@ -21,31 +22,23 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ApiService _api = ApiService();
-  List<Tutorial> _tutorials = [];
+  List<Artwork> _artworks = [];
   bool _loading = true;
-  String _selectedCategory = 'Tất cả';
-  final TextEditingController _searchController = TextEditingController();
-  String _keyword = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchTutorials();
-    _searchController.addListener(() {
-      setState(() => _keyword = _searchController.text);
-      _fetchTutorials();
-    });
+    _fetchArtworks();
   }
 
-  Future<void> _fetchTutorials() async {
+  Future<void> _fetchArtworks() async {
     setState(() => _loading = true);
     try {
-      final categoryParam = _selectedCategory == 'Tất cả' ? '' : _selectedCategory;
-      final res = await _api.get('/tutorials?category=$categoryParam&keyword=$_keyword');
+      final res = await _api.get('/artworks?sort=latest');
       if (res.statusCode == 200) {
         final List data = res.data;
         setState(() {
-          _tutorials = data.map((j) => Tutorial.fromJson(j)).toList();
+          _artworks = data.map((j) => Artwork.fromJson(j)).toList();
           _loading = false;
         });
       } else {
@@ -57,39 +50,41 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _selectCategory(String category) {
-    setState(() {
-      _selectedCategory = category;
-      _fetchTutorials();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(auth.user?.fullName ?? 'User'),
-            _buildSearchBar(),
-            _buildCategoryTabs(),
+            const SizedBox(height: 8),
             _loading
                 ? const Expanded(child: Center(child: CircularProgressIndicator()))
                 : Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _tutorials.length,
-                itemBuilder: (_, i) => TutorialCard(
-                  tutorial: _tutorials[i],
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TutorialDetailScreen(tutorialId: _tutorials[i].id),
-                      ),
-                    );
-                  },
+              child: RefreshIndicator(
+                onRefresh: _fetchArtworks,
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.8,
+                  ),
+                  itemCount: _artworks.length,
+                  itemBuilder: (_, i) => ArtworkCard(
+                    artwork: _artworks[i],
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ArtworkDetailScreen(artworkId: _artworks[i].id),
+                        ),
+                      ).then((_) => _fetchArtworks());
+                    },
+                  ),
                 ),
               ),
             ),
@@ -101,13 +96,13 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: (index) {
           if (index == 0) return;
           if (index == 1) {
-            // Navigate to tutorials screen (giữ nguyên home tạm thời)
+            Navigator.pushReplacementNamed(context, '/tutorials');
           } else if (index == 2) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const ArtDrawScreen()));
+            Navigator.pushReplacementNamed(context, '/art_draw');
           } else if (index == 3) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()));
+            Navigator.pushReplacementNamed(context, '/explore');
           } else if (index == 4) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+            Navigator.pushReplacementNamed(context, '/profile');
           }
         },
       ),
@@ -139,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+            onTap: () => Navigator.pushNamed(context, '/profile'),
             child: CircleAvatar(
               radius: 24,
               backgroundColor: AppColors.primary,
@@ -147,62 +142,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2))],
-        ),
-        child: TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: 'Tìm kiếm bài hướng dẫn...',
-            hintStyle: GoogleFonts.inter(color: AppColors.textLight),
-            prefixIcon: Icon(Icons.search, color: AppColors.textLight),
-            suffixIcon: _keyword.isNotEmpty
-                ? IconButton(icon: Icon(Icons.clear, color: AppColors.textLight), onPressed: () => _searchController.clear())
-                : null,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.all(16),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryTabs() {
-    final categories = ['Tất cả', 'Vẽ', 'Thủ công', 'Màu nước', 'Chân dung'];
-    return Container(
-      height: 50,
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: categories.length,
-        itemBuilder: (_, i) {
-          final cat = categories[i];
-          final selected = _selectedCategory == cat;
-          return GestureDetector(
-            onTap: () => _selectCategory(cat),
-            child: Container(
-              margin: const EdgeInsets.only(right: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: selected ? AppColors.primary : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Text(cat, style: GoogleFonts.inter(color: selected ? Colors.white : AppColors.text)),
-            ),
-          );
-        },
       ),
     );
   }

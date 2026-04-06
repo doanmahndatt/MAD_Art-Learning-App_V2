@@ -1,7 +1,17 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:path_provider/path_provider.dart';
+import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../utils/colors.dart';
+import '../widgets/bottom_nav_bar.dart';
+import 'home_screen.dart';
+import 'tutorials_screen.dart';
+import 'explore_screen.dart';
+import 'profile_screen.dart';
 
 class ArtDrawScreen extends StatefulWidget {
   const ArtDrawScreen({super.key});
@@ -15,6 +25,8 @@ class _ArtDrawScreenState extends State<ArtDrawScreen> {
   Color _currentColor = Colors.black;
   double _strokeWidth = 3.0;
   bool _isEraser = false;
+  final ApiService _api = ApiService();
+  int _currentIndex = 2; // màn Vẽ
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +36,7 @@ class _ArtDrawScreenState extends State<ArtDrawScreen> {
         actions: [
           IconButton(icon: const Icon(Icons.undo), onPressed: _undo),
           IconButton(icon: const Icon(Icons.clear), onPressed: _clear),
+          IconButton(icon: const Icon(Icons.save), onPressed: _saveDrawing),
         ],
       ),
       body: Column(
@@ -95,6 +108,29 @@ class _ArtDrawScreenState extends State<ArtDrawScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          if (index == _currentIndex) return;
+          switch (index) {
+            case 0:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+              break;
+            case 1:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorialsScreen()));
+              break;
+            case 2:
+            // đang ở đây
+              break;
+            case 3:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ExploreScreen()));
+              break;
+            case 4:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+              break;
+          }
+        },
+      ),
     );
   }
 
@@ -119,6 +155,44 @@ class _ArtDrawScreenState extends State<ArtDrawScreen> {
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
       ),
     );
+  }
+
+  Future<void> _saveDrawing() async {
+    if (_points.isEmpty) {
+      NotificationService.showError('Chưa có nét vẽ nào');
+      return;
+    }
+
+    // Chụp canvas thành ảnh
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final size = MediaQuery.of(context).size;
+    final painter = DrawingPainter(_points);
+    painter.paint(canvas, Size(size.width, size.height - 200));
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.width.toInt(), (size.height - 200).toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    final pngBytes = byteData!.buffer.asUint8List();
+
+    // Upload lên server (base64)
+    final base64Image = 'data:image/png;base64,${base64Encode(pngBytes)}';
+    try {
+      final res = await _api.post('/artworks', {
+        'title': 'Bức vẽ mới',
+        'description': 'Được tạo từ Art Studio',
+        'image_url': base64Image,
+        'is_public': true,
+        'source_type': 'drawing',
+      });
+      if (res.statusCode == 201) {
+        NotificationService.showSuccess('Đã lưu vào thư viện cá nhân');
+        Navigator.pop(context);
+      } else {
+        NotificationService.showError('Lưu thất bại');
+      }
+    } catch (e) {
+      NotificationService.showError('Lỗi: $e');
+    }
   }
 
   final List<Color> _colorPalette = [

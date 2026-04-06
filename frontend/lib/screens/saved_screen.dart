@@ -6,7 +6,13 @@ class SavedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Bài viết đã lưu')),
+      appBar: AppBar(
+        title: const Text('Bài viết đã lưu'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: const Center(child: Text('Chưa có bài viết nào được lưu')),
     );
   }
