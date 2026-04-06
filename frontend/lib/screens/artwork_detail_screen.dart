@@ -6,6 +6,7 @@ import '../services/notification_service.dart';
 import '../providers/auth_provider.dart';
 import '../utils/colors.dart';
 import '../widgets/comment_tile.dart';
+import 'dart:convert';
 
 class ArtworkDetailScreen extends StatefulWidget {
   final String artworkId;
@@ -144,6 +145,28 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
     }
   }
 
+  Widget _buildImage(String imageUrl) {
+    if (imageUrl.startsWith('data:image')) {
+      // Xử lý base64
+      final base64String = imageUrl.split(',').last;
+      return Image.memory(
+        base64Decode(base64String),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: 300,
+      );
+    } else {
+      return CachedNetworkImage(
+        imageUrl: imageUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: 300,
+        placeholder: (_, __) => Container(color: Colors.grey[200]),
+        errorWidget: (_, __, ___) => const Icon(Icons.broken_image, size: 50),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
@@ -165,12 +188,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CachedNetworkImage(
-              imageUrl: _artwork?['image_url'] ?? '',
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: 300,
-            ),
+            _buildImage(_artwork?['image_url'] ?? ''),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -181,6 +199,9 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                       CircleAvatar(
                         radius: 20,
                         backgroundImage: _artwork?['author']?['avatar_url'] != null ? NetworkImage(_artwork!['author']['avatar_url']) : null,
+                        child: _artwork?['author']?['avatar_url'] == null
+                            ? Text(_artwork?['author']?['full_name']?[0] ?? '?')
+                            : null,
                       ),
                       const SizedBox(width: 8),
                       Expanded(

@@ -1,5 +1,5 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/artwork.dart';
 import '../utils/colors.dart';
@@ -12,65 +12,92 @@ class ArtworkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Widget imageWidget;
+    final imageUrl = artwork.imageUrl;
+
+    if (imageUrl.startsWith('data:image')) {
+      // Xử lý base64
+      final base64String = imageUrl.split(',').last;
+      final bytes = base64Decode(base64String);
+      imageWidget = Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      );
+    } else {
+      // URL thường
+      imageWidget = CachedNetworkImage(
+        imageUrl: imageUrl,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(color: Colors.grey[200]),
+        errorWidget: (_, __, ___) => Container(color: Colors.grey[300], child: const Icon(Icons.broken_image)),
+      );
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Card(
-        color: Colors.white,
-        elevation: 2,
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 2,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: CachedNetworkImage(
-                imageUrl: artwork.imageUrl,
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(color: Colors.grey[200]),
-                errorWidget: (_, __, ___) => Icon(Icons.image_not_supported),
-              ),
+            AspectRatio(
+              aspectRatio: 1,
+              child: imageWidget,
             ),
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
                       CircleAvatar(
-                        radius: 14,
-                        backgroundImage: artwork.authorAvatar != null ? NetworkImage(artwork.authorAvatar!) : null,
-                        child: artwork.authorAvatar == null ? Text(artwork.authorName[0]) : null,
+                        radius: 12,
+                        backgroundImage: artwork.authorAvatar != null && !artwork.authorAvatar!.startsWith('data:')
+                            ? NetworkImage(artwork.authorAvatar!)
+                            : null,
+                        child: artwork.authorAvatar == null || artwork.authorAvatar!.startsWith('data:')
+                            ? Text(artwork.authorName.isNotEmpty ? artwork.authorName[0] : '?', style: const TextStyle(fontSize: 10))
+                            : null,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           artwork.authorName,
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Text(
                     artwork.title,
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                     maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       Icon(Icons.favorite, size: 14, color: AppColors.like),
-                      const SizedBox(width: 4),
-                      Text('${artwork.likesCount}', style: GoogleFonts.inter(fontSize: 12)),
+                      const SizedBox(width: 2),
+                      Text('${artwork.likesCount}', style: const TextStyle(fontSize: 11)),
+                      const SizedBox(width: 8),
+                      Icon(Icons.comment, size: 14, color: Colors.grey),
+                      const SizedBox(width: 2),
+                      Text('${artwork.commentsCount}', style: const TextStyle(fontSize: 11)),
                       const Spacer(),
                       Text(
                         '${artwork.createdAt.day}/${artwork.createdAt.month}',
-                        style: GoogleFonts.inter(fontSize: 11, color: AppColors.textLight),
+                        style: const TextStyle(fontSize: 10, color: Colors.grey),
                       ),
                     ],
                   ),
