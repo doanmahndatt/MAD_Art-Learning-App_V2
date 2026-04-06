@@ -9,6 +9,7 @@ import 'saved_screen.dart';
 import 'liked_screen.dart';
 import 'settings_screen.dart';
 import 'art_draw_screen.dart';
+import 'upload_artwork_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -124,6 +125,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
       child: Column(
         children: [
+          _menuItem(Icons.add_photo_alternate, 'Đăng tác phẩm mới', () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const UploadArtworkScreen())).then((_) => _fetchProfile());
+          }),
           _menuItem(Icons.color_lens, 'Vẽ sáng tạo', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArtDrawScreen()))),
           _menuItem(Icons.bookmark, 'Bài viết đã lưu', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedScreen()))),
           _menuItem(Icons.favorite, 'Bài viết đã thích', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LikedScreen()))),

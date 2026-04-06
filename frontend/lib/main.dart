@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'providers/auth_provider.dart';
+import 'services/notification_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/tutorial_detail_screen.dart';
@@ -12,6 +13,7 @@ import 'screens/edit_profile_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/liked_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/artwork_detail_screen.dart';
 import 'utils/colors.dart';
 
 void main() {
@@ -28,6 +30,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'ArtLearn',
         debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: NotificationService.messengerKey,
         theme: ThemeData(
           primarySwatch: Colors.blue,
           fontFamily: GoogleFonts.inter().fontFamily,
@@ -50,6 +53,10 @@ class MyApp extends StatelessWidget {
           '/saved': (context) => const SavedScreen(),
           '/liked': (context) => const LikedScreen(),
           '/settings': (context) => const SettingsScreen(),
+          '/artwork_detail': (context) {
+            final id = ModalRoute.of(context)!.settings.arguments as String;
+            return ArtworkDetailScreen(artworkId: id);
+          },
         },
       ),
     );
