@@ -1,5 +1,5 @@
     
-art_learning_app/
+    art_learning_app/
     ├── backend/
     │   ├── src/
     │   │   ├── auth/
