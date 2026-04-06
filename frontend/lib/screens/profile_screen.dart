@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../utils/colors.dart';
+import '../widgets/bottom_nav_bar.dart';
 import 'edit_profile_screen.dart';
 import 'login_screen.dart';
 import 'saved_screen.dart';
@@ -10,6 +11,9 @@ import 'liked_screen.dart';
 import 'settings_screen.dart';
 import 'art_draw_screen.dart';
 import 'upload_artwork_screen.dart';
+import 'home_screen.dart';
+import 'tutorials_screen.dart';
+import 'explore_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -23,6 +27,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _api = ApiService();
   Map<String, dynamic>? _profile;
   bool _loading = true;
+  int _currentIndex = 4; // màn Cá nhân
 
   @override
   void initState() {
@@ -45,6 +50,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       print(e);
       setState(() => _loading = false);
+    }
+  }
+
+  void _onNavBarTap(int index) {
+    if (index == _currentIndex) return;
+    switch (index) {
+      case 0:
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+        break;
+      case 1:
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TutorialsScreen()));
+        break;
+      case 2:
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ArtDrawScreen()));
+        break;
+      case 3:
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ExploreScreen()));
+        break;
+      case 4:
+      // đang ở profile
+        break;
     }
   }
 
@@ -73,6 +99,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildMenuItems(auth),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: _onNavBarTap,
       ),
     );
   }

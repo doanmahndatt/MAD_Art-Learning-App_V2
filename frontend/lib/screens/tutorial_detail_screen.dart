@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
+import '../providers/auth_provider.dart';
 import '../utils/colors.dart';
 
 class TutorialDetailScreen extends StatefulWidget {
@@ -17,15 +19,15 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
   Map<String, dynamic>? _tutorial;
   bool _loading = true;
   late TabController _tabController;
-  final TextEditingController _commentController = TextEditingController();
   List<dynamic> _comments = [];
-  bool _isFavorite = false;
+  final TextEditingController _commentController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _fetchDetail();
+    _fetchComments();
   }
 
   Future<void> _fetchDetail() async {
@@ -35,8 +37,6 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
       if (res.statusCode == 200) {
         setState(() {
           _tutorial = res.data;
-          _comments = _tutorial?['reviews'] ?? [];
-          _isFavorite = (_tutorial?['favorites'] as List?)?.isNotEmpty ?? false;
           _loading = false;
         });
       } else {
@@ -48,86 +48,141 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
     }
   }
 
-  Future<void> _toggleFavorite() async {
+  Future<void> _fetchComments() async {
     try {
-      final res = await _api.post('/tutorials/${widget.tutorialId}/favorite', {});
-      if (res.statusCode == 201) {
-        setState(() {
-          _isFavorite = !_isFavorite;
-          if (_isFavorite) {
-            _tutorial?['favorites'] = [{}];
-          } else {
-            _tutorial?['favorites'] = [];
-          }
-        });
+      final res = await _api.get('/tutorials/${widget.tutorialId}/comments');
+      if (res.statusCode == 200) {
+        setState(() => _comments = res.data);
       }
     } catch (e) {
       print(e);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+  Future<void> _addComment() async {
+    if (_commentController.text.trim().isEmpty) return;
+    try {
+      final res = await _api.post('/tutorials/${widget.tutorialId}/comments', {
+        'content': _commentController.text,
+      });
+      if (res.statusCode == 201) {
+        setState(() {
+          _comments.insert(0, res.data);
+          _commentController.clear();
+        });
+        NotificationService.showSuccess('Đã bình luận');
+      }
+    } catch (e) {
+      NotificationService.showError('Lỗi: $e');
+    }
+  }
+
+  Future<void> _editComment(String commentId, String oldContent) async {
+    final controller = TextEditingController(text: oldContent);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sửa bình luận'),
+        content: TextField(controller: controller, autofocus: true),
         actions: [
-          IconButton(icon: Icon(_isFavorite ? Icons.favorite : Icons.favorite_border, color: _isFavorite ? Colors.red : null), onPressed: _toggleFavorite),
-          IconButton(icon: const Icon(Icons.share), onPressed: () {}),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildThumbnail(),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(_tutorial?['title'] ?? '', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            CircleAvatar(radius: 16, backgroundImage: _tutorial?['author']?['avatar_url'] != null ? NetworkImage(_tutorial!['author']['avatar_url']) : null),
-                            const SizedBox(width: 8),
-                            Text(_tutorial?['author']?['full_name'] ?? 'Unknown', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(_tutorial?['description'] ?? '', style: GoogleFonts.inter(color: AppColors.textLight)),
-                        const SizedBox(height: 24),
-                        _buildTabs(),
-                        const SizedBox(height: 16),
-                        _buildTabContent(),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+            onPressed: () async {
+              final newContent = controller.text.trim();
+              if (newContent.isEmpty) return;
+              try {
+                final res = await _api.put('/tutorials/${widget.tutorialId}/comments/$commentId', {
+                  'content': newContent,
+                });
+                if (res.statusCode == 200) {
+                  setState(() {
+                    final index = _comments.indexWhere((c) => c['id'] == commentId);
+                    if (index != -1) _comments[index]['content'] = newContent;
+                  });
+                  NotificationService.showSuccess('Đã sửa');
+                  Navigator.pop(context);
+                }
+              } catch (e) {
+                NotificationService.showError('Lỗi sửa');
+              }
+            },
+            child: const Text('Lưu'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildThumbnail() {
-    return CachedNetworkImage(
-      imageUrl: _tutorial?['thumbnail_url'] ?? '',
-      height: 200,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      placeholder: (_, __) => Container(color: Colors.grey[200]),
+  Future<void> _deleteComment(String commentId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa bình luận'),
+        content: const Text('Bạn có chắc chắn muốn xóa?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Xóa', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      try {
+        await _api.delete('/tutorials/${widget.tutorialId}/comments/$commentId');
+        setState(() {
+          _comments.removeWhere((c) => c['id'] == commentId);
+        });
+        NotificationService.showSuccess('Đã xóa bình luận');
+      } catch (e) {
+        NotificationService.showError('Lỗi xóa');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final currentUserId = auth.user?.id;
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(_tutorial?['title'] ?? '', style: const TextStyle(fontSize: 16)),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CachedNetworkImage(
+              imageUrl: _tutorial?['thumbnail_url'] ?? '',
+              height: 200,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_tutorial?['title'] ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(_tutorial?['description'] ?? '', style: const TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 24),
+                  _buildTabs(),
+                  const SizedBox(height: 16),
+                  _buildTabContent(currentUserId),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -147,15 +202,15 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
     );
   }
 
-  Widget _buildTabContent() {
-    return Container(
+  Widget _buildTabContent(String? currentUserId) {
+    return SizedBox(
       height: 400,
       child: TabBarView(
         controller: _tabController,
         children: [
           _buildSteps(),
           _buildMaterials(),
-          _buildComments(),
+          _buildComments(currentUserId),
         ],
       ),
     );
@@ -172,19 +227,25 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Container(width: 32, height: 32, decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle), child: Center(child: Text('${step['step_order']}'))),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                      child: Center(child: Text('${step['step_order']}', style: const TextStyle(color: Colors.white))),
+                    ),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(step['title'], style: GoogleFonts.inter(fontWeight: FontWeight.w600))),
+                    Expanded(child: Text(step['title'], style: const TextStyle(fontWeight: FontWeight.bold))),
                   ],
                 ),
                 const SizedBox(height: 8),
                 if (step['image_url'] != null)
                   CachedNetworkImage(imageUrl: step['image_url'], height: 150, width: double.infinity, fit: BoxFit.cover),
                 const SizedBox(height: 8),
-                Text(step['content'], style: GoogleFonts.inter(color: AppColors.textLight)),
+                Text(step['content']),
               ],
             ),
           ),
@@ -208,7 +269,7 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
     );
   }
 
-  Widget _buildComments() {
+  Widget _buildComments(String? currentUserId) {
     return Column(
       children: [
         Row(
@@ -216,21 +277,40 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
             Expanded(
               child: TextField(
                 controller: _commentController,
-                decoration: InputDecoration(hintText: 'Add a comment...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24))),
+                decoration: InputDecoration(hintText: 'Viết bình luận...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24))),
               ),
             ),
-            IconButton(icon: Icon(Icons.send, color: AppColors.primary), onPressed: () {}),
+            IconButton(onPressed: _addComment, icon: const Icon(Icons.send, color: AppColors.primary)),
           ],
         ),
+        const SizedBox(height: 8),
         Expanded(
           child: ListView.builder(
             itemCount: _comments.length,
             itemBuilder: (_, i) {
               final c = _comments[i];
-              return ListTile(
-                leading: CircleAvatar(child: Text(c['user']?['full_name']?[0] ?? '?')),
-                title: Text(c['user']?['full_name'] ?? 'Anonymous'),
-                subtitle: Text(c['comment'] ?? ''),
+              final isOwner = c['user_id'] == currentUserId;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    child: c['user']?['full_name'] != null ? Text(c['user']['full_name'][0]) : const Icon(Icons.person),
+                  ),
+                  title: Text(c['user']?['full_name'] ?? 'Anonymous'),
+                  subtitle: Text(c['content']),
+                  trailing: isOwner
+                      ? PopupMenuButton(
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Sửa')),
+                      const PopupMenuItem(value: 'delete', child: Text('Xóa', style: TextStyle(color: Colors.red))),
+                    ],
+                    onSelected: (value) {
+                      if (value == 'edit') _editComment(c['id'], c['content']);
+                      else if (value == 'delete') _deleteComment(c['id']);
+                    },
+                  )
+                      : null,
+                ),
               );
             },
           ),

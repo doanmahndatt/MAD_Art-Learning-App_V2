@@ -153,7 +153,10 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(_artwork?['title'] ?? '', style: const TextStyle(fontSize: 16)),
       ),
       body: _loading

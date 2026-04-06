@@ -60,9 +60,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profile'), actions: [
-        TextButton(onPressed: _saveProfile, child: const Text('Save')),
-      ]),
+      appBar: AppBar(
+        title: const Text('Edit Profile'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          TextButton(onPressed: _saveProfile, child: const Text('Save')),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
