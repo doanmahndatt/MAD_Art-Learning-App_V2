@@ -81,7 +81,7 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 0.8,
+            childAspectRatio: 0.65,
           ),
           itemCount: _artworks.length,
           itemBuilder: (_, i) => ArtworkCard(
