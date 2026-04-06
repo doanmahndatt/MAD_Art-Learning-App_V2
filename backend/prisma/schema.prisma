@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String              @unique
+  password_hash     String
+  full_name         String
+  avatar_url        String?
+  bio               String?
+  role              String              @default("user")
+  is_active         Boolean             @default(true)
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now())
+  tutorials         Tutorial[]
+  artworks          Artwork[]
+  tutorial_favorites TutorialFavorite[]
+  tutorial_reviews  TutorialReview[]
+  artwork_likes     ArtworkLike[]
+  artwork_comments  ArtworkComment[]
+  notifications_received Notification[]  @relation("receiver")
+  notifications_acted   Notification[]  @relation("actor")
+}
+
+model Tutorial {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title             String
+  slug              String?             @unique
+  category          String
+  description       String
+  thumbnail_url     String?
+  difficulty_level  String?
+  created_by        String?             @db.Uuid
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now())
+  author            User?               @relation(fields: [created_by], references: [id])
+  steps             TutorialStep[]
+  materials         Material[]
+  favorites         TutorialFavorite[]
+  reviews           TutorialReview[]
+}
+
+model TutorialStep {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorial_id       String              @db.Uuid
+  step_order        Int
+  title             String
+  content           String
+  image_url         String?
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now())
+  tutorial          Tutorial            @relation(fields: [tutorial_id], references: [id], onDelete: Cascade)
+  @@unique([tutorial_id, step_order])
+}
+
+model Material {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorial_id       String              @db.Uuid
+  name              String
+  quantity          String?
+  note              String?
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now())
+  tutorial          Tutorial            @relation(fields: [tutorial_id], references: [id], onDelete: Cascade)
+}
+
+model TutorialFavorite {
+  user_id           String              @db.Uuid
+  tutorial_id       String              @db.Uuid
+  created_at        DateTime            @default(now())
+  user              User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  tutorial          Tutorial            @relation(fields: [tutorial_id], references: [id], onDelete: Cascade)
+  @@id([user_id, tutorial_id])
+}
+
+model TutorialReview {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorial_id       String              @db.Uuid
+  user_id           String              @db.Uuid
+  rating            Int
+  comment           String?
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now())
+  tutorial          Tutorial            @relation(fields: [tutorial_id], references: [id], onDelete: Cascade)
+  user              User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  @@unique([tutorial_id, user_id])
+}
+
+model Artwork {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String              @db.Uuid
+  title             String
+  description       String?
+  image_url         String
+  source_type       String              @default("upload")
+  is_public         Boolean             @default(true)
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now())
+  author            User                @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  likes             ArtworkLike[]
+  comments          ArtworkComment[]
+}
+
+model ArtworkLike {
+  user_id           String              @db.Uuid
+  artwork_id        String              @db.Uuid
+  created_at        DateTime            @default(now())
+  user              User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  artwork           Artwork             @relation(fields: [artwork_id], references: [id], onDelete: Cascade)
+  @@id([user_id, artwork_id])
+}
+
+model ArtworkComment {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  artwork_id        String              @db.Uuid
+  user_id           String              @db.Uuid
+  content           String
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now())
+  artwork           Artwork             @relation(fields: [artwork_id], references: [id], onDelete: Cascade)
+  user              User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  receiver_id       String              @db.Uuid
+  actor_id          String?             @db.Uuid
+  type              String
+  title             String
+  message           String
+  entity_type       String?
+  entity_id         String?             @db.Uuid
+  is_read           Boolean             @default(false)
+  created_at        DateTime            @default(now())
+  receiver          User                @relation("receiver", fields: [receiver_id], references: [id], onDelete: Cascade)
+  actor             User?               @relation("actor", fields: [actor_id], references: [id], onDelete: SetNull)
+}
