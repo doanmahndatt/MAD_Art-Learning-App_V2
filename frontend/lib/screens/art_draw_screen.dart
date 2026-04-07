@@ -1,10 +1,9 @@
 import 'dart:convert';
 import 'dart:ui' as ui;
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/bottom_nav_bar.dart';
@@ -12,9 +11,7 @@ import '../utils/colors.dart';
 
 class ArtDrawScreen extends StatefulWidget {
   const ArtDrawScreen({super.key});
-
-  @override
-  State<ArtDrawScreen> createState() => _ArtDrawScreenState();
+  @override State<ArtDrawScreen> createState() => _ArtDrawScreenState();
 }
 
 class _ArtDrawScreenState extends State<ArtDrawScreen> {
@@ -25,186 +22,101 @@ class _ArtDrawScreenState extends State<ArtDrawScreen> {
   final ApiService _api = ApiService();
   bool _saving = false;
 
+  final List<Color> _palette = [Colors.black, Colors.red, Colors.blue, Colors.green, Colors.yellow, Colors.orange, Colors.purple, Colors.pink, Colors.brown, Colors.cyan];
+
   @override
   Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+    final isDark = app.isDarkMode;
+    final surfColor = isDark ? AppColors.darkSurface : Colors.white;
+    final textColor = isDark ? AppColors.darkText    : AppColors.text;
+
     return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : AppColors.background,
       appBar: AppBar(
-        title: const Text('Art Studio'),
+        backgroundColor: surfColor, elevation: 0,
+        title: Text(app.t('art_studio'), style: TextStyle(color: textColor, fontWeight: FontWeight.w700)),
         actions: [
-          IconButton(icon: const Icon(Icons.undo), onPressed: _undo),
-          IconButton(icon: const Icon(Icons.clear), onPressed: _clear),
-          IconButton(icon: const Icon(Icons.save), onPressed: _saveDrawing),
+          IconButton(icon: Icon(Icons.undo, color: textColor), onPressed: () => setState(() { if (_points.isNotEmpty) _points.removeLast(); })),
+          IconButton(icon: Icon(Icons.clear, color: textColor), onPressed: () => setState(() => _points.clear())),
+          IconButton(icon: Icon(Icons.save_rounded, color: AppColors.primary), onPressed: () => _saveDrawing(app)),
         ],
       ),
-      body: _saving
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onPanUpdate: (details) {
-                setState(() {
-                  _points.add(DrawPoint(
-                    offset: details.localPosition,
-                    color: _isEraser ? Colors.white : _currentColor,
-                    strokeWidth: _strokeWidth,
-                  ));
-                });
-              },
-              child: CustomPaint(painter: DrawingPainter(_points), size: Size.infinite),
-            ),
+      body: _saving ? Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2.5))
+          : Column(children: [
+        Expanded(child: Container(
+          // Drawing canvas always white
+          color: Colors.white,
+          child: GestureDetector(
+            onPanUpdate: (d) => setState(() => _points.add(DrawPoint(offset: d.localPosition, color: _isEraser ? Colors.white : _currentColor, strokeWidth: _strokeWidth))),
+            child: CustomPaint(painter: DrawingPainter(_points), size: Size.infinite),
           ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              children: [
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      ..._colorPalette.map((color) => GestureDetector(
-                        onTap: () => setState(() {
-                          _currentColor = color;
-                          _isEraser = false;
-                        }),
-                        child: Container(
-                          margin: const EdgeInsets.all(4),
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: _currentColor == color ? Border.all(color: Colors.black, width: 2) : null),
-                        ),
-                      )),
-                      GestureDetector(
-                        onTap: () => _pickColor(),
-                        child: Container(
-                          margin: const EdgeInsets.all(4),
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle),
-                          child: const Icon(Icons.color_lens),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Row(
-                  children: [
-                    IconButton(icon: Icon(Icons.brush, color: !_isEraser ? AppColors.primary : null), onPressed: () => setState(() => _isEraser = false)),
-                    IconButton(icon: Icon(Icons.cleaning_services, color: _isEraser ? AppColors.primary : null), onPressed: () => setState(() => _isEraser = true)),
-                    Expanded(
-                      child: Slider(
-                        value: _strokeWidth,
-                        min: 1,
-                        max: 20,
-                        onChanged: (v) => setState(() => _strokeWidth = v),
-                      ),
-                    ),
-                    Text('${_strokeWidth.toInt()}px'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: 2,
-        onTap: (index) {
-          if (index == 2) return;
-          if (index == 0) Navigator.pushReplacementNamed(context, '/');
-          else if (index == 1) Navigator.pushReplacementNamed(context, '/tutorials');
-          else if (index == 3) Navigator.pushReplacementNamed(context, '/explore');
-          else if (index == 4) Navigator.pushReplacementNamed(context, '/profile');
-        },
-      ),
+        )),
+        Container(color: surfColor, padding: const EdgeInsets.all(8), child: Column(children: [
+          SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+            ..._palette.map((c) => GestureDetector(
+              onTap: () => setState(() { _currentColor = c; _isEraser = false; }),
+              child: Container(margin: const EdgeInsets.all(4), width: 36, height: 36,
+                  decoration: BoxDecoration(color: c, shape: BoxShape.circle,
+                      border: _currentColor == c && !_isEraser ? Border.all(color: AppColors.primary, width: 2.5) : null)),
+            )),
+            GestureDetector(onTap: _pickColor, child: Container(margin: const EdgeInsets.all(4), width: 36, height: 36,
+                decoration: BoxDecoration(color: isDark ? AppColors.darkSurfaceVariant : Colors.grey[200], shape: BoxShape.circle),
+                child: const Icon(Icons.color_lens, size: 18))),
+          ])),
+          Row(children: [
+            IconButton(icon: Icon(Icons.brush, color: !_isEraser ? AppColors.primary : (isDark ? AppColors.darkTextLight : AppColors.textLight)), onPressed: () => setState(() => _isEraser = false)),
+            IconButton(icon: Icon(Icons.cleaning_services, color: _isEraser ? AppColors.primary : (isDark ? AppColors.darkTextLight : AppColors.textLight)), onPressed: () => setState(() => _isEraser = true)),
+            Expanded(child: Slider(value: _strokeWidth, min: 1, max: 20, activeColor: AppColors.primary, onChanged: (v) => setState(() => _strokeWidth = v))),
+            Text('${_strokeWidth.toInt()}px', style: TextStyle(color: textColor, fontSize: 12)),
+          ]),
+        ])),
+      ]),
+      bottomNavigationBar: BottomNavBar(currentIndex: 2, onTap: (i) {
+        if (i == 2) return;
+        if (i == 0) Navigator.pushReplacementNamed(context, '/');
+        else if (i == 1) Navigator.pushReplacementNamed(context, '/tutorials');
+        else if (i == 3) Navigator.pushReplacementNamed(context, '/explore');
+        else if (i == 4) Navigator.pushReplacementNamed(context, '/profile');
+      }),
     );
-  }
-
-  void _undo() {
-    setState(() {
-      if (_points.isNotEmpty) _points.removeLast();
-    });
-  }
-
-  void _clear() {
-    setState(() {
-      _points.clear();
-    });
   }
 
   void _pickColor() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pick a color'),
-        content: SingleChildScrollView(child: ColorPicker(pickerColor: _currentColor, onColorChanged: (c) => setState(() => _currentColor = c))),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
-      ),
-    );
+    final app = Provider.of<AppProvider>(context, listen: false);
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: Text(app.t('language') == 'Language' ? 'Pick a color' : 'Chọn màu'),
+      content: SingleChildScrollView(child: ColorPicker(pickerColor: _currentColor, onColorChanged: (c) => setState(() => _currentColor = c))),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+    ));
   }
 
-  Future<void> _saveDrawing() async {
-    if (_points.isEmpty) {
-      NotificationService.showError('Chưa có nét vẽ nào');
-      return;
-    }
+  Future<void> _saveDrawing(AppProvider app) async {
+    if (_points.isEmpty) { NotificationService.showError(app.t('no_strokes')); return; }
     setState(() => _saving = true);
     try {
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
       final size = MediaQuery.of(context).size;
-      final painter = DrawingPainter(_points);
-      painter.paint(canvas, Size(size.width, size.height - 200));
-      final picture = recorder.endRecording();
-      final img = await picture.toImage(size.width.toInt(), (size.height - 200).toInt());
-      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-      final pngBytes = byteData!.buffer.asUint8List();
-      final base64Image = 'data:image/png;base64,${base64Encode(pngBytes)}';
-
-      final res = await _api.post('/artworks', {
-        'title': 'Bức vẽ mới',
-        'description': 'Được tạo từ Art Studio',
-        'image_url': base64Image,
-        'is_public': true,
-        'source_type': 'drawing',
-      });
-      if (res.statusCode == 201) {
-        NotificationService.showSuccess('Đã lưu tác phẩm');
-        Navigator.pushReplacementNamed(context, '/');
-      } else {
-        NotificationService.showError('Lưu thất bại');
-      }
-    } catch (e) {
-      NotificationService.showError('Lỗi: $e');
-    } finally {
-      setState(() => _saving = false);
-    }
+      DrawingPainter(_points).paint(canvas, Size(size.width, size.height - 200));
+      final img = await recorder.endRecording().toImage(size.width.toInt(), (size.height - 200).toInt());
+      final bytes = (await img.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+      final res = await _api.post('/artworks', {'title': app.language == AppLanguage.en ? 'New Drawing' : 'Bức vẽ mới', 'description': app.language == AppLanguage.en ? 'Created in Art Studio' : 'Được tạo từ Art Studio', 'image_url': 'data:image/png;base64,${base64Encode(bytes)}', 'is_public': true, 'source_type': 'drawing'});
+      if (res.statusCode == 201) { NotificationService.showSuccess(app.t('saved_artwork')); Navigator.pushReplacementNamed(context, '/'); }
+      else NotificationService.showError(app.t('save_failed'));
+    } catch (e) { NotificationService.showError('Error: $e'); }
+    finally { setState(() => _saving = false); }
   }
-
-  final List<Color> _colorPalette = [
-    Colors.black, Colors.red, Colors.blue, Colors.green, Colors.yellow, Colors.orange, Colors.purple, Colors.pink, Colors.brown, Colors.cyan,
-  ];
 }
 
-class DrawPoint {
-  final Offset offset;
-  final Color color;
-  final double strokeWidth;
-  DrawPoint({required this.offset, required this.color, required this.strokeWidth});
-}
+class DrawPoint { final Offset offset; final Color color; final double strokeWidth; DrawPoint({required this.offset, required this.color, required this.strokeWidth}); }
 
 class DrawingPainter extends CustomPainter {
-  final List<DrawPoint> points;
-  DrawingPainter(this.points);
-  @override
-  void paint(Canvas canvas, Size size) {
-    Paint paint = Paint()..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
-    for (int i = 0; i < points.length - 1; i++) {
-      paint.color = points[i].color;
-      paint.strokeWidth = points[i].strokeWidth;
-      canvas.drawLine(points[i].offset, points[i + 1].offset, paint);
-    }
+  final List<DrawPoint> points; DrawingPainter(this.points);
+  @override void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), Paint()..color = Colors.white);
+    final p = Paint()..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
+    for (int i = 0; i < points.length - 1; i++) { p.color = points[i].color; p.strokeWidth = points[i].strokeWidth; canvas.drawLine(points[i].offset, points[i+1].offset, p); }
   }
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  @override bool shouldRepaint(covariant CustomPainter _) => true;
 }

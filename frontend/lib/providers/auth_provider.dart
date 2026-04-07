@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/api_service.dart';
 import '../models/user.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
+  final ApiService _api = ApiService();
   User? _user;
   bool _isLoading = false;
 
@@ -45,10 +47,23 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Gọi sau khi edit profile thành công — re-fetch từ server để đồng bộ toàn app
+  Future<void> refreshUser() async {
+    try {
+      final res = await _api.get('/users/profile');
+      if (res.statusCode == 200) {
+        _user = User.fromJson(res.data);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('refreshUser error: $e');
+    }
+  }
+
   Future<void> loadUserFromToken() async {
     final token = await _authService.getToken();
     if (token != null) {
-      // Optionally fetch user profile from /users/profile
+      await refreshUser();
     }
   }
 }

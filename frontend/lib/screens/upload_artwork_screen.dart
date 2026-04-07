@@ -2,142 +2,87 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../utils/colors.dart';
 
 class UploadArtworkScreen extends StatefulWidget {
   const UploadArtworkScreen({super.key});
-
-  @override
-  State<UploadArtworkScreen> createState() => _UploadArtworkScreenState();
+  @override State<UploadArtworkScreen> createState() => _UploadArtworkScreenState();
 }
 
 class _UploadArtworkScreenState extends State<UploadArtworkScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _descController = TextEditingController();
   File? _imageFile;
-  bool _isPublic = true;
-  bool _loading = false;
+  bool _isPublic = true, _loading = false;
   final ApiService _api = ApiService();
-  final ImagePicker _picker = ImagePicker();
 
   Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() => _imageFile = File(pickedFile.path));
-    }
+    final p = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (p != null) setState(() => _imageFile = File(p.path));
   }
 
-  Future<void> _uploadArtwork() async {
-    if (_imageFile == null) {
-      NotificationService.showError('Vui lòng chọn ảnh');
-      return;
-    }
+  Future<void> _upload(AppProvider app) async {
+    if (_imageFile == null) { NotificationService.showError(app.t('please_select_img')); return; }
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _loading = true);
-
-    List<int> imageBytes = await _imageFile!.readAsBytes();
-    String base64Image = 'data:image/png;base64,${base64Encode(imageBytes)}';
-
     try {
-      final res = await _api.post('/artworks', {
-        'title': _titleController.text,
-        'description': _descriptionController.text,
-        'image_url': base64Image,
-        'is_public': _isPublic,
-        'source_type': 'upload',
-      });
-      if (res.statusCode == 201) {
-        NotificationService.showSuccess('Đăng tác phẩm thành công!');
-        Navigator.pop(context, true);
-      } else {
-        NotificationService.showError('Đăng thất bại, vui lòng thử lại');
-      }
-    } catch (e) {
-      NotificationService.showError('Lỗi: $e');
-    } finally {
-      setState(() => _loading = false);
-    }
+      final b64 = 'data:image/png;base64,${base64Encode(await _imageFile!.readAsBytes())}';
+      final res = await _api.post('/artworks', {'title': _titleController.text, 'description': _descController.text, 'image_url': b64, 'is_public': _isPublic, 'source_type': 'upload'});
+      if (res.statusCode == 201) { NotificationService.showSuccess(app.t('upload_success')); Navigator.pop(context, true); }
+      else NotificationService.showError(app.t('upload_fail'));
+    } catch (e) { NotificationService.showError('Error: $e'); }
+    finally { setState(() => _loading = false); }
   }
 
   @override
   Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+    final isDark = app.isDarkMode;
+    final bgColor   = isDark ? AppColors.darkBackground : AppColors.background;
+    final surfColor = isDark ? AppColors.darkSurface    : Colors.white;
+    final textColor = isDark ? AppColors.darkText       : AppColors.text;
+
     return Scaffold(
+      backgroundColor: bgColor,
       appBar: AppBar(
-        title: const Text('Đăng tác phẩm mới'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        backgroundColor: AppColors.primary, elevation: 0,
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Colors.white), onPressed: () => Navigator.pop(context)),
+        title: Text(app.t('upload_title'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                    image: _imageFile != null
-                        ? DecorationImage(image: FileImage(_imageFile!), fit: BoxFit.cover)
-                        : null,
-                  ),
-                  child: _imageFile == null
-                      ? const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_photo_alternate, size: 50, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text('Chạm để chọn ảnh'),
-                    ],
-                  )
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Tiêu đề *'),
-                validator: (v) => v!.isNotEmpty ? null : 'Không được để trống',
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Mô tả'),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Công khai'),
-                value: _isPublic,
-                onChanged: (v) => setState(() => _isPublic = v),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _uploadArtwork,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: AppColors.primary,
-                ),
-                child: const Text('Đăng', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        ),
-      ),
+      body: _loading ? Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2.5))
+          : SingleChildScrollView(padding: const EdgeInsets.all(16), child: Form(key: _formKey, child: Column(children: [
+        GestureDetector(onTap: _pickImage, child: Container(height: 200, width: double.infinity,
+            decoration: BoxDecoration(color: isDark ? AppColors.darkSurfaceVariant : Colors.grey[100], borderRadius: BorderRadius.circular(14),
+                image: _imageFile != null ? DecorationImage(image: FileImage(_imageFile!), fit: BoxFit.cover) : null),
+            child: _imageFile == null ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.add_photo_alternate_rounded, size: 50, color: isDark ? AppColors.darkTextLight : AppColors.textLight),
+              const SizedBox(height: 8),
+              // user-generated text — not translated
+              Text(app.t('select_image'), style: TextStyle(color: isDark ? AppColors.darkTextLight : AppColors.textLight)),
+            ]) : null)),
+        const SizedBox(height: 16),
+        TextFormField(controller: _titleController, style: TextStyle(color: textColor),
+            decoration: InputDecoration(labelText: app.t('title_field'), labelStyle: TextStyle(color: isDark ? AppColors.darkTextLight : AppColors.textLight),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary))),
+            validator: (v) => v!.isNotEmpty ? null : 'Required'),
+        const SizedBox(height: 16),
+        TextFormField(controller: _descController, style: TextStyle(color: textColor), maxLines: 3,
+            decoration: InputDecoration(labelText: app.t('desc_field'), labelStyle: TextStyle(color: isDark ? AppColors.darkTextLight : AppColors.textLight),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary)))),
+        const SizedBox(height: 12),
+        SwitchListTile(title: Text(app.t('public_toggle'), style: TextStyle(color: textColor)), value: _isPublic, activeColor: AppColors.primary, onChanged: (v) => setState(() => _isPublic = v)),
+        const SizedBox(height: 20),
+        ElevatedButton(onPressed: () => _upload(app),
+            style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            child: Text(app.t('upload_btn'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16))),
+      ]))),
     );
   }
 }

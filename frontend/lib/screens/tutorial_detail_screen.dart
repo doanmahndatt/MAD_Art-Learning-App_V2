@@ -2,17 +2,16 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
-import '../providers/auth_provider.dart';
 import '../utils/colors.dart';
 
 class TutorialDetailScreen extends StatefulWidget {
   final String tutorialId;
   const TutorialDetailScreen({super.key, required this.tutorialId});
-
-  @override
-  State<TutorialDetailScreen> createState() => _TutorialDetailScreenState();
+  @override State<TutorialDetailScreen> createState() => _TutorialDetailScreenState();
 }
 
 class _TutorialDetailScreenState extends State<TutorialDetailScreen> with SingleTickerProviderStateMixin {
@@ -24,316 +23,163 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
   final TextEditingController _commentController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _fetchDetail();
-    _fetchComments();
-  }
+  void initState() { super.initState(); _tabController = TabController(length: 3, vsync: this); _fetchDetail(); _fetchComments(); }
 
   Future<void> _fetchDetail() async {
     setState(() => _loading = true);
     try {
-      final response = await _api.get('/tutorials/${widget.tutorialId}');
-      if (response.statusCode == 200) {
-        setState(() {
-          _tutorial = response.data;
-          _loading = false;
-        });
-      } else {
-        setState(() => _loading = false);
-      }
-    } catch (e) {
-      print(e);
-      setState(() => _loading = false);
-    }
+      final r = await _api.get('/tutorials/${widget.tutorialId}');
+      if (r.statusCode == 200) setState(() { _tutorial = r.data; _loading = false; });
+      else setState(() => _loading = false);
+    } catch (e) { debugPrint('$e'); setState(() => _loading = false); }
   }
 
   Future<void> _fetchComments() async {
     try {
-      final response = await _api.get('/tutorials/${widget.tutorialId}/comments');
-      if (response.statusCode == 200) {
-        setState(() => _comments = response.data);
-      }
-    } catch (e) {
-      print(e);
-    }
+      final r = await _api.get('/tutorials/${widget.tutorialId}/comments');
+      if (r.statusCode == 200) setState(() => _comments = r.data);
+    } catch (e) { debugPrint('$e'); }
   }
 
-  Future<void> _addComment() async {
+  Future<void> _addComment(AppProvider app) async {
     if (_commentController.text.trim().isEmpty) return;
     try {
-      final response = await _api.post('/tutorials/${widget.tutorialId}/comments', {
-        'content': _commentController.text,
-      });
-      if (response.statusCode == 201) {
-        setState(() {
-          _comments.insert(0, response.data);
-          _commentController.clear();
-        });
-        NotificationService.showSuccess('Đã bình luận');
-      }
-    } catch (e) {
-      NotificationService.showError('Lỗi: $e');
-    }
+      final r = await _api.post('/tutorials/${widget.tutorialId}/comments', {'content': _commentController.text});
+      if (r.statusCode == 201) { setState(() { _comments.insert(0, r.data); _commentController.clear(); }); NotificationService.showSuccess(app.t('commented')); }
+    } catch (e) { NotificationService.showError('Error: $e'); }
   }
 
-  Future<void> _editComment(String commentId, String oldContent) async {
-    final controller = TextEditingController(text: oldContent);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sửa bình luận'),
-        content: TextField(controller: controller, autofocus: true),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
-          TextButton(
-            onPressed: () async {
-              final newContent = controller.text.trim();
-              if (newContent.isEmpty) return;
-              try {
-                final response = await _api.put('/tutorials/${widget.tutorialId}/comments/$commentId', {
-                  'content': newContent,
-                });
-                if (response.statusCode == 200) {
-                  setState(() {
-                    final index = _comments.indexWhere((c) => c['id'] == commentId);
-                    if (index != -1) _comments[index]['content'] = newContent;
-                  });
-                  NotificationService.showSuccess('Đã sửa');
-                  Navigator.pop(context);
-                }
-              } catch (e) {
-                NotificationService.showError('Lỗi sửa');
-              }
-            },
-            child: const Text('Lưu'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _editComment(String id, String old, AppProvider app) async {
+    final ctrl = TextEditingController(text: old);
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: Text(app.t('edit_comment')),
+      content: TextField(controller: ctrl, autofocus: true),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(app.t('cancel'))),
+        TextButton(onPressed: () async {
+          final c = ctrl.text.trim(); if (c.isEmpty) return;
+          try {
+            final r = await _api.put('/tutorials/${widget.tutorialId}/comments/$id', {'content': c});
+            if (r.statusCode == 200) {
+              setState(() { final i = _comments.indexWhere((x) => x['id'] == id); if (i != -1) _comments[i]['content'] = c; });
+              NotificationService.showSuccess(app.t('edited')); Navigator.pop(context);
+            }
+          } catch (e) { NotificationService.showError('Error'); }
+        }, child: Text(app.t('save'))),
+      ],
+    ));
   }
 
-  Future<void> _deleteComment(String commentId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xóa bình luận'),
-        content: const Text('Bạn có chắc chắn muốn xóa?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Xóa', style: TextStyle(color: Colors.red))),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      try {
-        await _api.delete('/tutorials/${widget.tutorialId}/comments/$commentId');
-        setState(() {
-          _comments.removeWhere((c) => c['id'] == commentId);
-        });
-        NotificationService.showSuccess('Đã xóa bình luận');
-      } catch (e) {
-        NotificationService.showError('Lỗi xóa');
-      }
-    }
+  Future<void> _deleteComment(String id, AppProvider app) async {
+    final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
+      title: Text(app.t('delete_comment')), content: Text(app.t('confirm_delete')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(app.t('cancel'))),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: Text(app.t('delete'), style: const TextStyle(color: Colors.red))),
+      ],
+    ));
+    if (ok == true) { try { await _api.delete('/tutorials/${widget.tutorialId}/comments/$id'); setState(() => _comments.removeWhere((c) => c['id'] == id)); NotificationService.showSuccess(app.t('deleted')); } catch (e) { NotificationService.showError('Error'); } }
   }
 
-  Widget _buildImage(String? imageUrl, {double height = 200}) {
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return Container(color: Colors.grey[200], height: height, child: const Icon(Icons.image_not_supported));
-    }
-    if (imageUrl.startsWith('data:image')) {
-      final base64 = imageUrl.split(',').last;
-      return Image.memory(base64Decode(base64), height: height, width: double.infinity, fit: BoxFit.cover);
-    } else {
-      return CachedNetworkImage(
-        imageUrl: imageUrl,
-        height: height,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        placeholder: (_, __) => Container(color: Colors.grey[200]),
-        errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
-      );
-    }
+  Widget _buildImage(String? url, {double h = 200}) {
+    if (url == null || url.isEmpty) return Container(color: Colors.grey[100], height: h, child: const Icon(Icons.image_not_supported));
+    if (url.startsWith('data:image')) return Image.memory(base64Decode(url.split(',').last), height: h, width: double.infinity, fit: BoxFit.cover);
+    return CachedNetworkImage(imageUrl: url, height: h, width: double.infinity, fit: BoxFit.cover,
+        placeholder: (_, __) => Container(color: Colors.grey[100]), errorWidget: (_, __, ___) => const Icon(Icons.broken_image));
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthProvider>(context);
-    final currentUserId = auth.user?.id;
+    final auth = context.watch<AuthProvider>();
+    final app  = context.watch<AppProvider>();
+    final isDark = app.isDarkMode;
+    final bgColor   = isDark ? AppColors.darkBackground : Colors.white;
+    final surfColor = isDark ? AppColors.darkSurface    : Colors.white;
+    final textColor = isDark ? AppColors.darkText       : AppColors.text;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(_tutorial?['title'] ?? '', style: const TextStyle(fontSize: 16)),
+        backgroundColor: surfColor, elevation: 0,
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: textColor), onPressed: () => Navigator.pop(context)),
+        title: Text(_tutorial?['title'] ?? '', style: TextStyle(fontSize: 16, color: textColor)),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildImage(_tutorial?['thumbnail_url']),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_tutorial?['title'] ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(_tutorial?['description'] ?? '', style: const TextStyle(color: Colors.grey)),
-                  const SizedBox(height: 24),
-                  _buildTabs(),
-                  const SizedBox(height: 16),
-                  _buildTabContent(currentUserId),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      body: _loading ? Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2.5))
+          : SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _buildImage(_tutorial?['thumbnail_url']),
+        Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(_tutorial?['title'] ?? '', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor)),
+          const SizedBox(height: 8),
+          Text(_tutorial?['description'] ?? '', style: TextStyle(color: isDark ? AppColors.darkTextLight : AppColors.textLight)),
+          const SizedBox(height: 24),
+          Container(decoration: BoxDecoration(border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border))),
+              child: TabBar(controller: _tabController, labelColor: AppColors.primary, unselectedLabelColor: isDark ? AppColors.darkTextLight : AppColors.textLight, indicatorColor: AppColors.primary,
+                tabs: [Tab(text: app.t('steps_tab')), Tab(text: app.t('materials_tab')), Tab(text: '${app.t("comments_tab")} (${_comments.length})')],
+              )),
+          SizedBox(height: 400, child: TabBarView(controller: _tabController, children: [
+            _buildSteps(isDark, textColor),
+            _buildMaterials(isDark, textColor),
+            _buildComments(auth.user?.id, app, isDark, textColor),
+          ])),
+        ])),
+      ])),
     );
   }
 
-  Widget _buildTabs() {
-    return Container(
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border))),
-      child: TabBar(
-        controller: _tabController,
-        labelColor: AppColors.primary,
-        unselectedLabelColor: AppColors.textLight,
-        tabs: [
-          const Tab(text: 'Hướng dẫn'),
-          const Tab(text: 'Vật liệu'),
-          Tab(child: Text('Bình luận (${_comments.length})')),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabContent(String? currentUserId) {
-    return SizedBox(
-      height: 400,
-      child: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildSteps(),
-          _buildMaterials(),
-          _buildComments(currentUserId),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSteps() {
+  Widget _buildSteps(bool isDark, Color textColor) {
     final steps = _tutorial?['steps'] ?? [];
-    return ListView.builder(
-      itemCount: steps.length,
-      itemBuilder: (_, i) {
-        final step = steps[i];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                      child: Center(child: Text('${step['step_order']}', style: const TextStyle(color: Colors.white))),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text(step['title'], style: const TextStyle(fontWeight: FontWeight.bold))),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (step['image_url'] != null && step['image_url'].isNotEmpty)
-                  _buildImage(step['image_url'], height: 150),
-                const SizedBox(height: 8),
-                Text(step['content']),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    return ListView.builder(itemCount: steps.length, itemBuilder: (_, i) {
+      final s = steps[i];
+      return Card(color: isDark ? AppColors.darkSurface : Colors.white, margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(width: 32, height: 32, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  child: Center(child: Text('${s['step_order']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
+              const SizedBox(width: 12),
+              Expanded(child: Text(s['title'], style: TextStyle(fontWeight: FontWeight.bold, color: textColor))),
+            ]),
+            if (s['image_url'] != null && s['image_url'].toString().isNotEmpty) ...[const SizedBox(height: 8), _buildImage(s['image_url'], h: 150)],
+            const SizedBox(height: 8),
+            Text(s['content'], style: TextStyle(color: textColor)),
+          ])));
+    });
   }
 
-  Widget _buildMaterials() {
-    final materials = _tutorial?['materials'] ?? [];
-    return ListView.builder(
-      itemCount: materials.length,
-      itemBuilder: (_, i) {
-        final m = materials[i];
-        return ListTile(
-          leading: Icon(Icons.brush, color: AppColors.primary),
-          title: Text(m['name']),
-          subtitle: m['quantity'] != null ? Text(m['quantity']) : null,
-        );
-      },
-    );
+  Widget _buildMaterials(bool isDark, Color textColor) {
+    final mats = _tutorial?['materials'] ?? [];
+    return ListView.builder(itemCount: mats.length, itemBuilder: (_, i) {
+      final m = mats[i];
+      return ListTile(leading: const Icon(Icons.brush, color: AppColors.primary),
+          title: Text(m['name'], style: TextStyle(color: textColor)),
+          subtitle: m['quantity'] != null ? Text(m['quantity'], style: TextStyle(color: isDark ? AppColors.darkTextLight : AppColors.textLight)) : null);
+    });
   }
 
-  Widget _buildComments(String? currentUserId) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _commentController,
-                decoration: InputDecoration(
-                  hintText: 'Viết bình luận...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
-                ),
-              ),
-            ),
-            IconButton(onPressed: _addComment, icon: const Icon(Icons.send, color: AppColors.primary)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: ListView.builder(
-            itemCount: _comments.length,
-            itemBuilder: (_, i) {
-              final c = _comments[i];
-              final isOwner = c['user_id'] == currentUserId;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    child: c['user']?['full_name'] != null ? Text(c['user']['full_name'][0]) : const Icon(Icons.person),
-                  ),
-                  title: Text(c['user']?['full_name'] ?? 'Anonymous'),
-                  subtitle: Text(c['content']),
-                  trailing: isOwner
-                      ? PopupMenuButton(
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Sửa')),
-                      const PopupMenuItem(value: 'delete', child: Text('Xóa', style: TextStyle(color: Colors.red))),
-                    ],
-                    onSelected: (value) {
-                      if (value == 'edit') _editComment(c['id'], c['content']);
-                      else if (value == 'delete') _deleteComment(c['id']);
-                    },
-                  )
-                      : null,
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
+  Widget _buildComments(String? uid, AppProvider app, bool isDark, Color textColor) {
+    return Column(children: [
+      Row(children: [
+        Expanded(child: TextField(controller: _commentController, style: TextStyle(color: textColor),
+            decoration: InputDecoration(hintText: app.t('write_comment'), hintStyle: TextStyle(color: isDark ? AppColors.darkTextLight : AppColors.textLight),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.border)),
+            ))),
+        IconButton(onPressed: () => _addComment(app), icon: const Icon(Icons.send_rounded, color: AppColors.primary)),
+      ]),
+      const SizedBox(height: 8),
+      Expanded(child: ListView.builder(itemCount: _comments.length, itemBuilder: (_, i) {
+        final c = _comments[i]; final isOwner = c['user_id'] == uid;
+        return Card(color: isDark ? AppColors.darkSurface : Colors.white, margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: CircleAvatar(backgroundColor: AppColors.primaryLight,
+                  child: c['user']?['full_name'] != null ? Text(c['user']['full_name'][0], style: const TextStyle(color: AppColors.primary)) : const Icon(Icons.person)),
+              title: Text(c['user']?['full_name'] ?? 'Anonymous', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+              subtitle: Text(c['content'] ?? '', style: TextStyle(color: isDark ? AppColors.darkTextLight : AppColors.textLight)),
+              trailing: isOwner ? PopupMenuButton(itemBuilder: (_) => [
+                PopupMenuItem(value: 'edit', child: Text(app.t('save'))),
+                PopupMenuItem(value: 'delete', child: Text(app.t('delete'), style: const TextStyle(color: Colors.red))),
+              ], onSelected: (v) { if (v == 'edit') _editComment(c['id'], c['content'], app); else _deleteComment(c['id'], app); }) : null,
+            ));
+      })),
+    ]);
   }
 }
