@@ -306,6 +306,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _MenuItem(Icons.favorite_rounded,        app.t('liked'),          const Color(0xFFFF7BAC), const Color(0xFFFFE4EE), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const LikedScreen()));
       }),
+      _MenuItem(Icons.notifications_rounded,   'Notifications',         const Color(0xFFFFABC8), const Color(0xFFFFEDF4), () {
+        Navigator.pushNamed(context, '/notifications');
+      }),
       _MenuItem(Icons.settings_rounded,        app.t('settings'),       const Color(0xFF9B8FFF), const Color(0xFFEDE9FF), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()))
             .then((_) => setState(() {}));

@@ -3,6 +3,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateArtworkDto } from './dto/create-artwork.dto';
 import { UpdateArtworkDto } from './dto/update-artwork.dto';
 
+const publicUserSelect = {
+  id: true,
+  full_name: true,
+  avatar_url: true,
+};
+
 @Injectable()
 export class ArtworksService {
   constructor(private prisma: PrismaService) {}
@@ -14,7 +20,7 @@ export class ArtworksService {
     }
     return this.prisma.artwork.findMany({
       where: isPublicOnly ? { is_public: true } : {},
-      include: { author: true, likes: true, comments: { take: 3 } },
+      include: { author: { select: publicUserSelect }, likes: true, comments: { take: 3 } },
       orderBy,
     });
   }
@@ -23,9 +29,9 @@ export class ArtworksService {
     const artwork = await this.prisma.artwork.findUnique({
       where: { id },
       include: {
-        author: true,
+        author: { select: publicUserSelect },
         likes: true,
-        comments: { include: { user: true }, orderBy: { created_at: 'desc' } },
+        comments: { include: { user: { select: publicUserSelect } }, orderBy: { created_at: 'desc' } },
       },
     });
     if (!artwork) throw new NotFoundException('Artwork not found');
@@ -35,7 +41,7 @@ export class ArtworksService {
   async create(userId: string, dto: CreateArtworkDto) {
     return this.prisma.artwork.create({
       data: { ...dto, user_id: userId },
-      include: { author: true, likes: true, comments: true },
+      include: { author: { select: publicUserSelect }, likes: true, comments: true },
     });
   }
 
@@ -53,7 +59,7 @@ export class ArtworksService {
         is_public: dto.is_public,
         updated_at: new Date(),
       },
-      include: { author: true, likes: true, comments: true },
+      include: { author: { select: publicUserSelect }, likes: true, comments: true },
     });
   }
 
@@ -79,7 +85,7 @@ export class ArtworksService {
   async getUserLikedArtworks(userId: string) {
     const likes = await this.prisma.artworkLike.findMany({
       where: { user_id: userId },
-      include: { artwork: { include: { author: true, likes: true, comments: true } } },
+      include: { artwork: { include: { author: { select: publicUserSelect }, likes: true, comments: true } } },
       orderBy: { created_at: 'desc' },
     });
     return likes.map((like) => like.artwork);

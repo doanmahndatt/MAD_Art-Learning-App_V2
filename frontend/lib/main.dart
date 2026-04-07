@@ -16,6 +16,7 @@ import 'screens/liked_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/artwork_detail_screen.dart';
 import 'screens/create_tutorial_screen.dart';
+import 'screens/notifications_screen.dart';
 import 'utils/colors.dart';
 
 void main() {
@@ -97,6 +98,7 @@ class MyApp extends StatelessWidget {
               final id = ModalRoute.of(context)!.settings.arguments as String;
               return ArtworkDetailScreen(artworkId: id);
             },
+            '/notifications': (_) => const NotificationsScreen(),
           },
         ),
       ),
@@ -120,7 +122,12 @@ class _StartupRouterState extends State<_StartupRouter> {
   }
 
   Future<void> _restore() async {
-    await Provider.of<AuthProvider>(context, listen: false).loadUserFromToken();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final app = Provider.of<AppProvider>(context, listen: false);
+    await auth.loadUserFromToken();
+    if (auth.user != null) {
+      await app.syncNotificationsFromServer(auth.user!.notificationEnabled);
+    }
     if (mounted) setState(() => _ready = true);
   }
 

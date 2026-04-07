@@ -93,7 +93,9 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
           _comments.insert(0, res.data);
           _commentController.clear();
         });
+        await _fetchDetail();
         NotificationService.showSuccess(app.t('commented'));
+
       }
     } catch (e) {
       NotificationService.showError('Error: $e');
@@ -118,8 +120,9 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                 if (r.statusCode == 200) {
                   setState(() {
                     final i = _comments.indexWhere((x) => x['id'] == id);
-                    if (i != -1) _comments[i]['content'] = c;
+                    if (i != -1) _comments[i] = r.data;
                   });
+                  await _fetchDetail();
                   NotificationService.showSuccess(app.t('edited'));
                   Navigator.pop(context);
                 }
@@ -152,7 +155,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
     if (ok == true) {
       try {
         await _api.delete('/comments/$id');
-        setState(() => _comments.removeWhere((c) => c['id'] == id));
+        await _fetchDetail();
         NotificationService.showSuccess(app.t('deleted'));
       } catch (e) {
         NotificationService.showError('Error');

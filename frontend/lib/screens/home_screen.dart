@@ -83,18 +83,24 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(name, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: textColor)),
           ]),
         ]),
-        GestureDetector(
-          onTap: () => Navigator.pushNamed(context, '/profile'),
-          child: CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primaryLight,
-            backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                ? (avatarUrl.startsWith('data:image') ? MemoryImage(base64Decode(avatarUrl.split(',').last)) : NetworkImage(avatarUrl) as ImageProvider)
-                : null,
-            child: (avatarUrl == null || avatarUrl.isEmpty)
-                ? Text(name.isNotEmpty ? name[0].toUpperCase() : 'U', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)) : null,
+        Row(children: [
+          IconButton(
+            onPressed: () => Navigator.pushNamed(context, '/notifications'),
+            icon: const Icon(Icons.notifications_none_rounded, color: AppColors.primary),
           ),
-        ),
+          GestureDetector(
+            onTap: () => Navigator.pushNamed(context, '/profile'),
+            child: CircleAvatar(
+              radius: 24,
+              backgroundColor: AppColors.primaryLight,
+              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                  ? (avatarUrl.startsWith('data:image') ? MemoryImage(base64Decode(avatarUrl.split(',').last)) : NetworkImage(avatarUrl) as ImageProvider)
+                  : null,
+              child: (avatarUrl == null || avatarUrl.isEmpty)
+                  ? Text(name.isNotEmpty ? name[0].toUpperCase() : 'U', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)) : null,
+            ),
+          ),
+        ]),
       ]),
     );
   }

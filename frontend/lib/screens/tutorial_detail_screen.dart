@@ -7,6 +7,7 @@ import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../utils/colors.dart';
+import '../widgets/comment_tile.dart';
 import 'edit_tutorial_screen.dart';
 
 class TutorialDetailScreen extends StatefulWidget {
@@ -82,7 +83,10 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen>
           _comments.insert(0, r.data);
           _commentController.clear();
         });
+        await _fetchComments();
+        await _fetchDetail();
         NotificationService.showSuccess(app.t('commented'));
+
       }
     } catch (e) {
       NotificationService.showError('Error: $e');
@@ -107,8 +111,10 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen>
                 if (r.statusCode == 200) {
                   setState(() {
                     final i = _comments.indexWhere((x) => x['id'] == id);
-                    if (i != -1) _comments[i]['content'] = c;
+                    if (i != -1) _comments[i] = r.data;
                   });
+                  await _fetchComments();
+                  await _fetchDetail();
                   NotificationService.showSuccess(app.t('edited'));
                   Navigator.pop(context);
                 }
@@ -141,7 +147,8 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen>
     if (ok == true) {
       try {
         await _api.delete('/tutorials/${widget.tutorialId}/comments/$id');
-        setState(() => _comments.removeWhere((c) => c['id'] == id));
+        await _fetchComments();
+        await _fetchDetail();
         NotificationService.showSuccess(app.t('deleted'));
       } catch (e) {
         NotificationService.showError('Error');
@@ -375,38 +382,11 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen>
           itemBuilder: (_, i) {
             final c = _comments[i];
             final isOwner = c['user_id'] == uid;
-            return Card(
-              color: isDark ? AppColors.darkSurface : Colors.white,
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.primaryLight,
-                  child: c['user']?['full_name'] != null
-                      ? Text(c['user']['full_name'][0], style: const TextStyle(color: AppColors.primary))
-                      : const Icon(Icons.person),
-                ),
-                title: Text(c['user']?['full_name'] ?? 'Anonymous',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-                subtitle: Text(c['content'] ?? '',
-                    style: TextStyle(color: isDark ? AppColors.darkTextLight : AppColors.textLight)),
-                trailing: isOwner
-                    ? PopupMenuButton(
-                  itemBuilder: (_) => [
-                    PopupMenuItem(value: 'edit', child: Text(app.t('save'))),
-                    PopupMenuItem(
-                        value: 'delete',
-                        child: Text(app.t('delete'), style: const TextStyle(color: Colors.red))),
-                  ],
-                  onSelected: (v) {
-                    if (v == 'edit') {
-                      _editComment(c['id'], c['content'], app);
-                    } else {
-                      _deleteComment(c['id'], app);
-                    }
-                  },
-                )
-                    : null,
-              ),
+            return CommentTile(
+              comment: Map<String, dynamic>.from(c),
+              isOwner: isOwner,
+              onEdit: () => _editComment(c['id'], c['content'], app),
+              onDelete: () => _deleteComment(c['id'], app),
             );
           },
         ),

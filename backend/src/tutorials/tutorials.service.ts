@@ -4,6 +4,11 @@ import { CreateTutorialDto } from './dto/create-tutorial.dto';
 import { UpdateTutorialDto } from './dto/update-tutorial.dto';
 
 const VALID_CATEGORIES = ['Vẽ', 'Thủ công', 'Màu nước', 'Chân dung'];
+const publicUserSelect = {
+  id: true,
+  full_name: true,
+  avatar_url: true,
+};
 
 @Injectable()
 export class TutorialsService {
@@ -12,25 +17,14 @@ export class TutorialsService {
   private normalizeCategory(category?: string) {
     const raw = (category ?? '').trim();
     if (!raw) return raw;
-    return (
-      VALID_CATEGORIES.find((c) => c.toLowerCase() == raw.toLowerCase()) ?? raw
-    );
+    return VALID_CATEGORIES.find((c) => c.toLowerCase() == raw.toLowerCase()) ?? raw;
   }
 
   async findAll(category?: string, keyword?: string) {
     const conditions: any[] = [];
-
     const cat = this.normalizeCategory(category);
-    if (cat !== '') {
-      conditions.push({
-        category: {
-          equals: cat,
-          mode: 'insensitive',
-        },
-      });
-    }
-
     const kw = (keyword ?? '').trim();
+
     if (kw !== '') {
       conditions.push({
         OR: [
@@ -40,12 +34,10 @@ export class TutorialsService {
       });
     }
 
-    const where = conditions.length > 0 ? { AND: conditions } : {};
-
-    return this.prisma.tutorial.findMany({
-      where,
+    const tutorials = await this.prisma.tutorial.findMany({
+      where: conditions.length > 0 ? { AND: conditions } : {},
       include: {
-        author: true,
+        author: { select: publicUserSelect },
         steps: { orderBy: { step_order: 'asc' }, select: { image_url: true } },
         materials: true,
         comments: true,
@@ -53,18 +45,21 @@ export class TutorialsService {
       },
       orderBy: { created_at: 'desc' },
     });
+
+    if (!cat) return tutorials;
+    return tutorials.filter((tutorial) => this.normalizeCategory(tutorial.category) == cat);
   }
 
   async findOne(id: string) {
     const tutorial = await this.prisma.tutorial.findUnique({
       where: { id },
       include: {
-        author: true,
+        author: { select: publicUserSelect },
         steps: { orderBy: { step_order: 'asc' } },
         materials: true,
-        reviews: { include: { user: true }, orderBy: { created_at: 'desc' } },
+        reviews: { include: { user: { select: publicUserSelect } }, orderBy: { created_at: 'desc' } },
         favorites: true,
-        comments: { include: { user: true }, orderBy: { created_at: 'desc' } },
+        comments: { include: { user: { select: publicUserSelect } }, orderBy: { created_at: 'desc' } },
       },
     });
     if (!tutorial) throw new NotFoundException('Tutorial not found');
@@ -85,7 +80,7 @@ export class TutorialsService {
         materials: { create: materials },
       },
       include: {
-        author: true,
+        author: { select: publicUserSelect },
         steps: { orderBy: { step_order: 'asc' } },
         materials: true,
         comments: true,
@@ -122,7 +117,7 @@ export class TutorialsService {
           materials: materials ? { create: materials } : undefined,
         },
         include: {
-          author: true,
+          author: { select: publicUserSelect },
           steps: { orderBy: { step_order: 'asc' } },
           materials: true,
           comments: true,

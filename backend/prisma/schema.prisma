@@ -21,6 +21,7 @@ model User {
   is_active         Boolean             @default(true)
   created_at        DateTime            @default(now())
   updated_at        DateTime            @default(now())
+  notification_enabled Boolean          @default(true)
   tutorials         Tutorial[]
   artworks          Artwork[]
   tutorial_favorites TutorialFavorite[]

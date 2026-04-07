@@ -1,10 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../utils/colors.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
+  Future<void> _updateNotificationSetting(BuildContext context, bool value) async {
+    final app = context.read<AppProvider>();
+    final auth = context.read<AuthProvider>();
+    final api = ApiService();
+    final oldValue = app.notificationsEnabled;
+    await app.setNotifications(value);
+    try {
+      await api.put('/users/profile', {'notification_enabled': value});
+      await auth.refreshUser();
+      await app.syncNotificationsFromServer(value);
+      NotificationService.showSuccess(value ? 'Notifications enabled' : 'Notifications disabled');
+    } catch (e) {
+      await app.setNotifications(oldValue);
+      NotificationService.showError(NotificationService.readableError(e));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,7 +119,7 @@ class SettingsScreen extends StatelessWidget {
                 subtitleColor: subColor,
                 trailing: _PastelSwitch(
                   value: app.notificationsEnabled,
-                  onChanged: (v) => app.setNotifications(v),
+                  onChanged: (v) => _updateNotificationSetting(context, v),
                 ),
                 isDark: isDark,
                 borderColor: borderColor,

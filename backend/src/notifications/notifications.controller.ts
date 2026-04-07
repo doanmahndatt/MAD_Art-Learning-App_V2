@@ -6,7 +6,7 @@ import { GetUser } from '../common/decorators/get-user.decorator';
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
-constructor(private notificationsService: NotificationsService) {}
+  constructor(private notificationsService: NotificationsService) {}
 
   @Get()
   findByUser(@GetUser() user: any) {
@@ -14,7 +14,7 @@ constructor(private notificationsService: NotificationsService) {}
   }
 
   @Patch(':id/read')
-  markAsRead(@Param('id') id: string) {
-    return this.notificationsService.markAsRead(id);
+  markAsRead(@Param('id') id: string, @GetUser() user: any) {
+    return this.notificationsService.markAsRead(id, user.id);
   }
 }

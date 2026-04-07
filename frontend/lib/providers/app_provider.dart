@@ -175,7 +175,14 @@ class AppProvider with ChangeNotifier {
   }
 
   Future<void> setNotifications(bool value) async {
-    _notificationsEnabled = value; notifyListeners();
+    _notificationsEnabled = value;
+    notifyListeners();
+    (await SharedPreferences.getInstance()).setBool('notifications', value);
+  }
+
+  Future<void> syncNotificationsFromServer(bool value) async {
+    _notificationsEnabled = value;
+    notifyListeners();
     (await SharedPreferences.getInstance()).setBool('notifications', value);
   }
 }
