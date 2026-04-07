@@ -67,10 +67,11 @@ class _TutorialsScreenState extends State<TutorialsScreen> {
   Future<void> _fetchTutorials() async {
     setState(() => _loading = true);
     try {
-      // Send DB value for category, trim keyword
-      final catParam = Uri.encodeComponent(_selectedCategoryDb);
-      final kwParam  = Uri.encodeComponent(_keyword);
-      final res = await _api.get('/tutorials?category=$catParam&keyword=$kwParam');
+      final queryParameters = <String, dynamic>{
+        'category': _selectedCategoryDb,
+        'keyword': _keyword,
+      };
+      final res = await _api.get('/tutorials', queryParameters: queryParameters);
       if (res.statusCode == 200) {
         setState(() {
           _tutorials = (res.data as List).map((j) => Tutorial.fromJson(j)).toList();

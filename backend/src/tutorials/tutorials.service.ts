@@ -2,34 +2,56 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTutorialDto } from './dto/create-tutorial.dto';
 
-// Canonical category values — must match exactly what frontend sends and what's stored in DB
-const VALID_CATEGORIES = ['Vẽ', 'Thủ công', 'Màu nước', 'Chân dung'];
+const CATEGORY_ALIASES: Record<string, string[]> = {
+'Vẽ': ['Vẽ', 'Ve', 'Draw', 'Drawing', 'Sketch', 'Pencil Drawing'],
+'Thủ công': ['Thủ công', 'Thu cong', 'Craft', 'Crafts', 'Handicraft', 'DIY'],
+'Màu nước': ['Màu nước', 'Mau nuoc', 'Watercolor', 'Watercolour', 'Aquarelle'],
+'Chân dung': ['Chân dung', 'Chan dung', 'Portrait', 'Portrait Drawing'],
+};
+
+function normalizeText(value?: string | null): string {
+  return (value ?? '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+function canonicalizeCategory(value?: string | null): string {
+  const normalized = normalizeText(value);
+
+  for (const [canonical, aliases] of Object.entries(CATEGORY_ALIASES)) {
+    const allCandidates = [canonical, ...aliases];
+    if (allCandidates.some((candidate) => normalizeText(candidate) === normalized)) {
+      return canonical;
+    }
+  }
+
+  return (value ?? '').trim();
+}
+
+function normalizeTutorialCategory<T extends { category?: string | null }>(tutorial: T): T {
+  return {
+    ...tutorial,
+    category: canonicalizeCategory(tutorial.category),
+  };
+}
 
 @Injectable()
 export class TutorialsService {
-constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
   async findAll(category?: string, keyword?: string) {
     const conditions: any[] = [];
 
-    // Category filter
-    // Frontend sends canonical Vietnamese value ('Vẽ', 'Thủ công', etc.) or empty string for "All"
-    const cat = (category ?? '').trim();
-    if (cat !== '') {
-      conditions.push({
-        category: {
-          equals: cat,
-          mode: 'insensitive',  // handle any accidental case mismatch
-        },
-      });
-    }
-
-    // Keyword filter — AND with category (not OR)
     const kw = (keyword ?? '').trim();
     if (kw !== '') {
       conditions.push({
         OR: [
-          { title:       { contains: kw, mode: 'insensitive' } },
+          { title: { contains: kw, mode: 'insensitive' } },
           { description: { contains: kw, mode: 'insensitive' } },
         ],
       });
@@ -37,17 +59,30 @@ constructor(private prisma: PrismaService) {}
 
     const where = conditions.length > 0 ? { AND: conditions } : {};
 
-    return this.prisma.tutorial.findMany({
+    const tutorials = await this.prisma.tutorial.findMany({
       where,
       include: {
         author: true,
-        steps:     { orderBy: { step_order: 'asc' }, select: { image_url: true } },
+        steps: { orderBy: { step_order: 'asc' }, select: { image_url: true } },
         materials: true,
-        comments:  true,
+        comments: true,
         favorites: true,
       },
       orderBy: { created_at: 'desc' },
     });
+
+    const normalizedTutorials = tutorials.map((tutorial) =>
+      normalizeTutorialCategory(tutorial),
+    );
+
+    const selectedCanonicalCategory = canonicalizeCategory(category);
+    if (!selectedCanonicalCategory) {
+      return normalizedTutorials;
+    }
+
+    return normalizedTutorials.filter(
+      (tutorial) => tutorial.category === selectedCanonicalCategory,
+    );
   }
 
   async findOne(id: string) {
@@ -55,24 +90,20 @@ constructor(private prisma: PrismaService) {}
       where: { id },
       include: {
         author: true,
-        steps:     { orderBy: { step_order: 'asc' } },
+        steps: { orderBy: { step_order: 'asc' } },
         materials: true,
-        reviews:   { include: { user: true }, orderBy: { created_at: 'desc' } },
+        reviews: { include: { user: true }, orderBy: { created_at: 'desc' } },
         favorites: true,
-        comments:  { include: { user: true }, orderBy: { created_at: 'desc' } },
+        comments: { include: { user: true }, orderBy: { created_at: 'desc' } },
       },
     });
     if (!tutorial) throw new NotFoundException('Tutorial not found');
-    return tutorial;
+    return normalizeTutorialCategory(tutorial);
   }
 
   async create(userId: string, dto: CreateTutorialDto) {
     const { steps, materials, ...tutorialData } = dto;
-
-    // Normalize category to canonical form before saving
-    const normalizedCategory = VALID_CATEGORIES.find(
-      (c) => c.toLowerCase() === dto.category.trim().toLowerCase()
-    ) ?? dto.category.trim();
+    const normalizedCategory = canonicalizeCategory(dto.category);
 
     return this.prisma.tutorial.create({
       data: {
@@ -80,7 +111,7 @@ constructor(private prisma: PrismaService) {}
         category: normalizedCategory,
         slug: dto.title.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
         created_by: userId,
-        steps:     { create: steps },
+        steps: { create: steps },
         materials: { create: materials },
       },
       include: { steps: true, materials: true },
