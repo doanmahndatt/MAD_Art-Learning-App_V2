@@ -29,9 +29,4 @@ constructor(private tutorialsService: TutorialsService) {}
   toggleFavorite(@GetUser() user: any, @Param('id') id: string) {
     return this.tutorialsService.toggleFavorite(user.id, id);
   }
-
-  @Get(':id/comments')
-  getComments(@Param('id') id: string) {
-  return this.tutorialsService.getComments(id);
-  }
 }

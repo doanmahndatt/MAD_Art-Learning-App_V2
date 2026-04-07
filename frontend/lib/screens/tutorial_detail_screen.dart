@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
@@ -33,10 +34,10 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
   Future<void> _fetchDetail() async {
     setState(() => _loading = true);
     try {
-      final res = await _api.get('/tutorials/${widget.tutorialId}');
-      if (res.statusCode == 200) {
+      final response = await _api.get('/tutorials/${widget.tutorialId}');
+      if (response.statusCode == 200) {
         setState(() {
-          _tutorial = res.data;
+          _tutorial = response.data;
           _loading = false;
         });
       } else {
@@ -50,9 +51,9 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
 
   Future<void> _fetchComments() async {
     try {
-      final res = await _api.get('/tutorials/${widget.tutorialId}/comments');
-      if (res.statusCode == 200) {
-        setState(() => _comments = res.data);
+      final response = await _api.get('/tutorials/${widget.tutorialId}/comments');
+      if (response.statusCode == 200) {
+        setState(() => _comments = response.data);
       }
     } catch (e) {
       print(e);
@@ -62,12 +63,12 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
   Future<void> _addComment() async {
     if (_commentController.text.trim().isEmpty) return;
     try {
-      final res = await _api.post('/tutorials/${widget.tutorialId}/comments', {
+      final response = await _api.post('/tutorials/${widget.tutorialId}/comments', {
         'content': _commentController.text,
       });
-      if (res.statusCode == 201) {
+      if (response.statusCode == 201) {
         setState(() {
-          _comments.insert(0, res.data);
+          _comments.insert(0, response.data);
           _commentController.clear();
         });
         NotificationService.showSuccess('Đã bình luận');
@@ -91,10 +92,10 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
               final newContent = controller.text.trim();
               if (newContent.isEmpty) return;
               try {
-                final res = await _api.put('/tutorials/${widget.tutorialId}/comments/$commentId', {
+                final response = await _api.put('/tutorials/${widget.tutorialId}/comments/$commentId', {
                   'content': newContent,
                 });
-                if (res.statusCode == 200) {
+                if (response.statusCode == 200) {
                   setState(() {
                     final index = _comments.indexWhere((c) => c['id'] == commentId);
                     if (index != -1) _comments[index]['content'] = newContent;
@@ -138,6 +139,25 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
     }
   }
 
+  Widget _buildImage(String? imageUrl, {double height = 200}) {
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return Container(color: Colors.grey[200], height: height, child: const Icon(Icons.image_not_supported));
+    }
+    if (imageUrl.startsWith('data:image')) {
+      final base64 = imageUrl.split(',').last;
+      return Image.memory(base64Decode(base64), height: height, width: double.infinity, fit: BoxFit.cover);
+    } else {
+      return CachedNetworkImage(
+        imageUrl: imageUrl,
+        height: height,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(color: Colors.grey[200]),
+        errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
@@ -159,12 +179,7 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CachedNetworkImage(
-              imageUrl: _tutorial?['thumbnail_url'] ?? '',
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
+            _buildImage(_tutorial?['thumbnail_url']),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -193,10 +208,10 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
         controller: _tabController,
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textLight,
-        tabs: const [
-          Tab(text: 'Hướng dẫn'),
-          Tab(text: 'Vật liệu'),
-          Tab(text: 'Bình luận'),
+        tabs: [
+          const Tab(text: 'Hướng dẫn'),
+          const Tab(text: 'Vật liệu'),
+          Tab(child: Text('Bình luận (${_comments.length})')),
         ],
       ),
     );
@@ -242,8 +257,8 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
                   ],
                 ),
                 const SizedBox(height: 8),
-                if (step['image_url'] != null)
-                  CachedNetworkImage(imageUrl: step['image_url'], height: 150, width: double.infinity, fit: BoxFit.cover),
+                if (step['image_url'] != null && step['image_url'].isNotEmpty)
+                  _buildImage(step['image_url'], height: 150),
                 const SizedBox(height: 8),
                 Text(step['content']),
               ],
@@ -277,7 +292,10 @@ class _TutorialDetailScreenState extends State<TutorialDetailScreen> with Single
             Expanded(
               child: TextField(
                 controller: _commentController,
-                decoration: InputDecoration(hintText: 'Viết bình luận...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(24))),
+                decoration: InputDecoration(
+                  hintText: 'Viết bình luận...',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                ),
               ),
             ),
             IconButton(onPressed: _addComment, icon: const Icon(Icons.send, color: AppColors.primary)),

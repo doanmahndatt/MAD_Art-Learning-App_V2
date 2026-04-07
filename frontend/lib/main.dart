@@ -11,11 +11,11 @@ import 'screens/art_draw_screen.dart';
 import 'screens/explore_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/edit_profile_screen.dart';
-import 'screens/saved_screen.dart';
 import 'screens/liked_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/artwork_detail_screen.dart';
 import 'utils/colors.dart';
+import 'screens/create_tutorial_screen.dart';
 
 void main() {
   runApp(MyApp());
@@ -52,9 +52,9 @@ class MyApp extends StatelessWidget {
           '/explore': (context) => const ExploreScreen(),
           '/profile': (context) => const ProfileScreen(),
           '/edit_profile': (context) => const EditProfileScreen(),
-          '/saved': (context) => const SavedScreen(),
           '/liked': (context) => const LikedScreen(),
           '/settings': (context) => const SettingsScreen(),
+          '/create_tutorial': (context) => const CreateTutorialScreen(),
           '/artwork_detail': (context) {
             final id = ModalRoute.of(context)!.settings.arguments as String;
             return ArtworkDetailScreen(artworkId: id);

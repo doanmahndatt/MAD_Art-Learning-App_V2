@@ -17,7 +17,13 @@ constructor(private prisma: PrismaService) {}
     }
     return this.prisma.tutorial.findMany({
       where,
-      include: { author: true, steps: { orderBy: { step_order: 'asc' } }, materials: true },
+      include: {
+        author: true,
+        steps: { orderBy: { step_order: 'asc' }, select: { image_url: true } },
+        materials: true,
+        comments: true,
+        favorites: true,
+      },
       orderBy: { created_at: 'desc' },
     });
   }
@@ -31,6 +37,7 @@ constructor(private prisma: PrismaService) {}
         materials: true,
         reviews: { include: { user: true }, orderBy: { created_at: 'desc' } },
         favorites: true,
+        comments: { include: { user: true }, orderBy: { created_at: 'desc' } },
       },
     });
     if (!tutorial) throw new NotFoundException('Tutorial not found');
@@ -56,18 +63,15 @@ constructor(private prisma: PrismaService) {}
       where: { user_id_tutorial_id: { user_id: userId, tutorial_id: tutorialId } },
     });
     if (existing) {
-      await this.prisma.tutorialFavorite.delete({ where: { user_id_tutorial_id: { user_id: userId, tutorial_id: tutorialId } } });
+      await this.prisma.tutorialFavorite.delete({
+        where: { user_id_tutorial_id: { user_id: userId, tutorial_id: tutorialId } },
+      });
       return { favorited: false };
     } else {
-      await this.prisma.tutorialFavorite.create({ data: { user_id: userId, tutorial_id: tutorialId } });
+      await this.prisma.tutorialFavorite.create({
+        data: { user_id: userId, tutorial_id: tutorialId },
+      });
       return { favorited: true };
     }
   }
-    async getComments(tutorialId: string) {
-      return this.prisma.tutorialComment.findMany({
-        where: { tutorial_id: tutorialId },
-        include: { user: true },
-        orderBy: { created_at: 'desc' },
-      });
-    }
 }

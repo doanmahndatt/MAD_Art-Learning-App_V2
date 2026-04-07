@@ -38,7 +38,7 @@ class Tutorial {
       authorAvatar: json['author']?['avatar_url'],
       stepsCount: json['steps']?.length ?? 0,
       likesCount: json['favorites']?.length ?? 0,
-      commentsCount: json['reviews']?.length ?? 0,
+      commentsCount: json['comments']?.length ?? 0,
       difficultyLevel: json['difficulty_level'],
       createdAt: DateTime.parse(json['created_at']),
     );

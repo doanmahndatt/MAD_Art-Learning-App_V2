@@ -8,10 +8,7 @@ import '../widgets/bottom_nav_bar.dart';
 import '../utils/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'artwork_detail_screen.dart';
-import 'tutorials_screen.dart';
-import 'art_draw_screen.dart';
-import 'explore_screen.dart';
-import 'profile_screen.dart';
+import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(auth.user?.fullName ?? 'User'),
+            _buildHeader(auth.user?.fullName ?? 'User', auth.user?.avatarUrl),
             const SizedBox(height: 8),
             _loading
                 ? const Expanded(child: Center(child: CircularProgressIndicator()))
@@ -109,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader(String name) {
+  Widget _buildHeader(String name, String? avatarUrl) {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -117,12 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(12)),
-                child: const Center(child: Text('A', style: TextStyle(color: Colors.white, fontSize: 20))),
-              ),
+              Image.asset('assets/images/logo.png', width: 40, height: 40, fit: BoxFit.cover),
               const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,8 +129,14 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () => Navigator.pushNamed(context, '/profile'),
             child: CircleAvatar(
               radius: 24,
-              backgroundColor: AppColors.primary,
-              child: Text(name.isNotEmpty ? name[0] : 'U', style: const TextStyle(color: Colors.white)),
+              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                  ? (avatarUrl.startsWith('data:image')
+                  ? MemoryImage(base64Decode(avatarUrl.split(',').last))
+                  : NetworkImage(avatarUrl) as ImageProvider)
+                  : null,
+              child: (avatarUrl == null || avatarUrl.isEmpty)
+                  ? Text(name.isNotEmpty ? name[0] : 'U', style: const TextStyle(color: Colors.white))
+                  : null,
             ),
           ),
         ],

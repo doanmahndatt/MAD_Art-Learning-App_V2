@@ -6,14 +6,17 @@ import { CreateArtworkDto } from './dto/create-artwork.dto';
 export class ArtworksService {
 constructor(private prisma: PrismaService) {}
 
-  async findAll(isPublicOnly = true, sortBy: 'latest' | 'popular' = 'latest') {
-    // Tạm thời bỏ qua sortBy popular, chỉ dùng latest
-    return this.prisma.artwork.findMany({
-      where: isPublicOnly ? { is_public: true } : {},
-      include: { author: true, likes: true, comments: { take: 3 } },
-      orderBy: { created_at: 'desc' },
-    });
-  }
+    async findAll(isPublicOnly = true, sortBy: 'latest' | 'popular' = 'latest') {
+      let orderBy: any = { created_at: 'desc' };
+      if (sortBy === 'popular') {
+        orderBy = { likes: { _count: 'desc' } };
+      }
+      return this.prisma.artwork.findMany({
+        where: isPublicOnly ? { is_public: true } : {},
+        include: { author: true, likes: true, comments: { take: 3 } },
+        orderBy,
+      });
+    }
 
   async findOne(id: string) {
     const artwork = await this.prisma.artwork.findUnique({
@@ -49,4 +52,12 @@ constructor(private prisma: PrismaService) {}
       return { liked: true };
     }
   }
+    async getUserLikedArtworks(userId: string) {
+      const likes = await this.prisma.artworkLike.findMany({
+        where: { user_id: userId },
+        include: { artwork: { include: { author: true, likes: true, comments: true } } },
+        orderBy: { created_at: 'desc' },
+      });
+      return likes.map(like => like.artwork);
+    }
 }

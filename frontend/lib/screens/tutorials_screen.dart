@@ -2,14 +2,10 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/tutorial.dart';
 import '../widgets/tutorial_card.dart';
-import '../widgets/bottom_nav_bar.dart';
 import '../utils/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'tutorial_detail_screen.dart';
-import 'home_screen.dart';
-import 'art_draw_screen.dart';
-import 'explore_screen.dart';
-import 'profile_screen.dart';
+import '../widgets/bottom_nav_bar.dart';
 
 class TutorialsScreen extends StatefulWidget {
   const TutorialsScreen({super.key});
@@ -25,7 +21,6 @@ class _TutorialsScreenState extends State<TutorialsScreen> {
   String _selectedCategory = 'Tất cả';
   final TextEditingController _searchController = TextEditingController();
   String _keyword = '';
-  int _currentIndex = 1; // vì đây là màn Hướng dẫn
 
   @override
   void initState() {
@@ -41,7 +36,7 @@ class _TutorialsScreenState extends State<TutorialsScreen> {
     setState(() => _loading = true);
     try {
       final categoryParam = _selectedCategory == 'Tất cả' ? '' : _selectedCategory;
-      final res = await _api.get('/tutorials?category=$categoryParam&keyword=$_keyword');
+      final res = await _api.get('/tutorials?category=${Uri.encodeComponent(categoryParam)}&keyword=${Uri.encodeComponent(_keyword)}');
       if (res.statusCode == 200) {
         final List data = res.data;
         setState(() {
@@ -62,27 +57,6 @@ class _TutorialsScreenState extends State<TutorialsScreen> {
       _selectedCategory = category;
       _fetchTutorials();
     });
-  }
-
-  void _onNavBarTap(int index) {
-    if (index == _currentIndex) return;
-    switch (index) {
-      case 0:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
-        break;
-      case 1:
-      // đang ở tutorials
-        break;
-      case 2:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ArtDrawScreen()));
-        break;
-      case 3:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ExploreScreen()));
-        break;
-      case 4:
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-        break;
-    }
   }
 
   @override
@@ -117,8 +91,14 @@ class _TutorialsScreenState extends State<TutorialsScreen> {
         ),
       ),
       bottomNavigationBar: BottomNavBar(
-        currentIndex: _currentIndex,
-        onTap: _onNavBarTap,
+        currentIndex: 1,
+        onTap: (index) {
+          if (index == 1) return;
+          if (index == 0) Navigator.pushReplacementNamed(context, '/');
+          else if (index == 2) Navigator.pushReplacementNamed(context, '/art_draw');
+          else if (index == 3) Navigator.pushReplacementNamed(context, '/explore');
+          else if (index == 4) Navigator.pushReplacementNamed(context, '/profile');
+        },
       ),
     );
   }
