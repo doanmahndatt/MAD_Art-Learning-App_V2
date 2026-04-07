@@ -61,7 +61,7 @@ constructor(private prisma: PrismaService) {}
 
   async getUserArtworks(userId: string) {
       return this.prisma.artwork.findMany({
-        where: { user_id: userId, is_public: true },
+        where: { user_id: userId },
         include: { author: true, likes: true, comments: true },
         orderBy: { created_at: 'desc' },
       });

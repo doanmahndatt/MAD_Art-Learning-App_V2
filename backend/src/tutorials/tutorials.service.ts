@@ -1,51 +1,34 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTutorialDto } from './dto/create-tutorial.dto';
+import { UpdateTutorialDto } from './dto/update-tutorial.dto';
 
-const CATEGORY_ALIASES: Record<string, string[]> = {
-'Vẽ': ['Vẽ', 'Ve', 'Draw', 'Drawing', 'Sketch', 'Pencil Drawing'],
-'Thủ công': ['Thủ công', 'Thu cong', 'Craft', 'Crafts', 'Handicraft', 'DIY'],
-'Màu nước': ['Màu nước', 'Mau nuoc', 'Watercolor', 'Watercolour', 'Aquarelle'],
-'Chân dung': ['Chân dung', 'Chan dung', 'Portrait', 'Portrait Drawing'],
-};
-
-function normalizeText(value?: string | null): string {
-  return (value ?? '')
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
-    .replace(/\s+/g, ' ')
-    .toLowerCase();
-}
-
-function canonicalizeCategory(value?: string | null): string {
-  const normalized = normalizeText(value);
-
-  for (const [canonical, aliases] of Object.entries(CATEGORY_ALIASES)) {
-    const allCandidates = [canonical, ...aliases];
-    if (allCandidates.some((candidate) => normalizeText(candidate) === normalized)) {
-      return canonical;
-    }
-  }
-
-  return (value ?? '').trim();
-}
-
-function normalizeTutorialCategory<T extends { category?: string | null }>(tutorial: T): T {
-  return {
-    ...tutorial,
-    category: canonicalizeCategory(tutorial.category),
-  };
-}
+const VALID_CATEGORIES = ['Vẽ', 'Thủ công', 'Màu nước', 'Chân dung'];
 
 @Injectable()
 export class TutorialsService {
   constructor(private prisma: PrismaService) {}
 
+  private normalizeCategory(category?: string) {
+    const raw = (category ?? '').trim();
+    if (!raw) return raw;
+    return (
+      VALID_CATEGORIES.find((c) => c.toLowerCase() == raw.toLowerCase()) ?? raw
+    );
+  }
+
   async findAll(category?: string, keyword?: string) {
     const conditions: any[] = [];
+
+    const cat = this.normalizeCategory(category);
+    if (cat !== '') {
+      conditions.push({
+        category: {
+          equals: cat,
+          mode: 'insensitive',
+        },
+      });
+    }
 
     const kw = (keyword ?? '').trim();
     if (kw !== '') {
@@ -59,7 +42,7 @@ export class TutorialsService {
 
     const where = conditions.length > 0 ? { AND: conditions } : {};
 
-    const tutorials = await this.prisma.tutorial.findMany({
+    return this.prisma.tutorial.findMany({
       where,
       include: {
         author: true,
@@ -70,19 +53,6 @@ export class TutorialsService {
       },
       orderBy: { created_at: 'desc' },
     });
-
-    const normalizedTutorials = tutorials.map((tutorial) =>
-      normalizeTutorialCategory(tutorial),
-    );
-
-    const selectedCanonicalCategory = canonicalizeCategory(category);
-    if (!selectedCanonicalCategory) {
-      return normalizedTutorials;
-    }
-
-    return normalizedTutorials.filter(
-      (tutorial) => tutorial.category === selectedCanonicalCategory,
-    );
   }
 
   async findOne(id: string) {
@@ -98,12 +68,12 @@ export class TutorialsService {
       },
     });
     if (!tutorial) throw new NotFoundException('Tutorial not found');
-    return normalizeTutorialCategory(tutorial);
+    return tutorial;
   }
 
   async create(userId: string, dto: CreateTutorialDto) {
     const { steps, materials, ...tutorialData } = dto;
-    const normalizedCategory = canonicalizeCategory(dto.category);
+    const normalizedCategory = this.normalizeCategory(dto.category);
 
     return this.prisma.tutorial.create({
       data: {
@@ -114,8 +84,58 @@ export class TutorialsService {
         steps: { create: steps },
         materials: { create: materials },
       },
-      include: { steps: true, materials: true },
+      include: {
+        author: true,
+        steps: { orderBy: { step_order: 'asc' } },
+        materials: true,
+        comments: true,
+        favorites: true,
+      },
     });
+  }
+
+  async update(userId: string, tutorialId: string, dto: UpdateTutorialDto) {
+    const tutorial = await this.prisma.tutorial.findFirst({ where: { id: tutorialId, created_by: userId } });
+    if (!tutorial) throw new NotFoundException('Tutorial not found or not owned');
+
+    const { steps, materials, ...tutorialData } = dto;
+    const normalizedCategory = dto.category ? this.normalizeCategory(dto.category) : undefined;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (steps) {
+        await tx.tutorialStep.deleteMany({ where: { tutorial_id: tutorialId } });
+      }
+      if (materials) {
+        await tx.material.deleteMany({ where: { tutorial_id: tutorialId } });
+      }
+
+      return tx.tutorial.update({
+        where: { id: tutorialId },
+        data: {
+          title: tutorialData.title,
+          category: normalizedCategory,
+          description: tutorialData.description,
+          thumbnail_url: tutorialData.thumbnail_url,
+          difficulty_level: tutorialData.difficulty_level,
+          updated_at: new Date(),
+          steps: steps ? { create: steps } : undefined,
+          materials: materials ? { create: materials } : undefined,
+        },
+        include: {
+          author: true,
+          steps: { orderBy: { step_order: 'asc' } },
+          materials: true,
+          comments: true,
+          favorites: true,
+        },
+      });
+    });
+  }
+
+  async delete(userId: string, tutorialId: string) {
+    const tutorial = await this.prisma.tutorial.findFirst({ where: { id: tutorialId, created_by: userId } });
+    if (!tutorial) throw new NotFoundException('Tutorial not found or not owned');
+    return this.prisma.tutorial.delete({ where: { id: tutorialId } });
   }
 
   async toggleFavorite(userId: string, tutorialId: string) {
