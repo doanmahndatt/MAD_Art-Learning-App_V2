@@ -87,6 +87,20 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
     if (ok == true) { try { await _api.delete('/comments/$id'); setState(() => _comments.removeWhere((c) => c['id'] == id)); NotificationService.showSuccess(app.t('deleted')); } catch (e) { NotificationService.showError('Error'); } }
   }
 
+  ImageProvider? _buildAvatarProvider(String? avatarUrl) {
+    if (avatarUrl == null || avatarUrl.isEmpty) return null;
+
+    if (avatarUrl.startsWith('data:image')) {
+      try {
+        return MemoryImage(base64Decode(avatarUrl.split(',').last));
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return NetworkImage(avatarUrl);
+  }
+
   Widget _buildImage(String url) {
     // Artwork image always shown on white background
     if (url.startsWith('data:image')) return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover, width: double.infinity, height: 300);
@@ -116,9 +130,17 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
         Container(color: Colors.white, child: _buildImage(_artwork?['image_url'] ?? '')),
         Container(color: surfColor, padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            CircleAvatar(radius: 20, backgroundColor: AppColors.primaryLight,
-                backgroundImage: _artwork?['author']?['avatar_url'] != null ? NetworkImage(_artwork!['author']['avatar_url']) : null,
-                child: _artwork?['author']?['avatar_url'] == null ? Text(_artwork?['author']?['full_name']?[0] ?? '?', style: const TextStyle(color: AppColors.primary)) : null),
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.primaryLight,
+              backgroundImage: _buildAvatarProvider(_artwork?['author']?['avatar_url']?.toString()),
+              child: _buildAvatarProvider(_artwork?['author']?['avatar_url']?.toString()) == null
+                  ? Text(
+                _artwork?['author']?['full_name']?[0] ?? '?',
+                style: const TextStyle(color: AppColors.primary),
+              )
+                  : null,
+            ),
             const SizedBox(width: 8),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(_artwork?['author']?['full_name'] ?? 'Unknown', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),

@@ -2,3 +2,6 @@ user1: demo1@stu.ptit.edu.vn | 123456
 user2: demo2@gmail.com | 123456
 user3: demo3@gmail.com | 123456
 user4: demo4@gmail.com | 123456
+
+
+~~run FE for both devices: flutter run -d all
