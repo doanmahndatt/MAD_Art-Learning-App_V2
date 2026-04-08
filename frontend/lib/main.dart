@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'providers/auth_provider.dart';
 import 'providers/app_provider.dart';
+import 'providers/notification_provider.dart';
 import 'services/notification_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
@@ -40,7 +41,11 @@ class MyApp extends StatelessWidget {
       onSurface: AppColors.text,
     ),
     scaffoldBackgroundColor: AppColors.background,
-    appBarTheme: const AppBarTheme(backgroundColor: AppColors.surface, elevation: 0, foregroundColor: AppColors.text),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.surface,
+      elevation: 0,
+      foregroundColor: AppColors.text,
+    ),
     cardColor: AppColors.surface,
     dividerColor: AppColors.border,
   );
@@ -59,7 +64,11 @@ class MyApp extends StatelessWidget {
       onSurface: AppColors.darkText,
     ),
     scaffoldBackgroundColor: AppColors.darkBackground,
-    appBarTheme: const AppBarTheme(backgroundColor: AppColors.darkSurface, elevation: 0, foregroundColor: AppColors.darkText),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.darkSurface,
+      elevation: 0,
+      foregroundColor: AppColors.darkText,
+    ),
     cardColor: AppColors.darkSurface,
     dividerColor: AppColors.darkBorder,
   );
@@ -70,6 +79,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: Consumer<AppProvider>(
         builder: (_, app, __) => MaterialApp(
@@ -81,18 +91,18 @@ class MyApp extends StatelessWidget {
           themeMode: app.themeMode,
           home: const _StartupRouter(),
           routes: {
-            '/home':      (_) => const HomeScreen(),
+            '/home': (_) => const HomeScreen(),
             '/tutorials': (_) => const TutorialsScreen(),
             '/tutorial_detail': (context) {
               final args = ModalRoute.of(context)!.settings.arguments as String;
               return TutorialDetailScreen(tutorialId: args);
             },
-            '/art_draw':     (_) => const ArtDrawScreen(),
-            '/explore':      (_) => const ExploreScreen(),
-            '/profile':      (_) => const ProfileScreen(),
+            '/art_draw': (_) => const ArtDrawScreen(),
+            '/explore': (_) => const ExploreScreen(),
+            '/profile': (_) => const ProfileScreen(),
             '/edit_profile': (_) => const EditProfileScreen(),
-            '/liked':        (_) => const LikedScreen(),
-            '/settings':     (_) => const SettingsScreen(),
+            '/liked': (_) => const LikedScreen(),
+            '/settings': (_) => const SettingsScreen(),
             '/create_tutorial': (_) => const CreateTutorialScreen(),
             '/artwork_detail': (context) {
               final id = ModalRoute.of(context)!.settings.arguments as String;
@@ -109,7 +119,9 @@ class MyApp extends StatelessWidget {
 /// Handles app startup: restore session from saved token before deciding which screen to show
 class _StartupRouter extends StatefulWidget {
   const _StartupRouter();
-  @override State<_StartupRouter> createState() => _StartupRouterState();
+
+  @override
+  State<_StartupRouter> createState() => _StartupRouterState();
 }
 
 class _StartupRouterState extends State<_StartupRouter> {
@@ -124,10 +136,14 @@ class _StartupRouterState extends State<_StartupRouter> {
   Future<void> _restore() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final app = Provider.of<AppProvider>(context, listen: false);
+
     await auth.loadUserFromToken();
+
     if (auth.user != null) {
       await app.syncNotificationsFromServer(auth.user!.notificationEnabled);
+      Provider.of<NotificationProvider>(context, listen: false).startPolling();
     }
+
     if (mounted) setState(() => _ready = true);
   }
 
@@ -135,9 +151,15 @@ class _StartupRouterState extends State<_StartupRouter> {
   Widget build(BuildContext context) {
     if (!_ready) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2.5)),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+            strokeWidth: 2.5,
+          ),
+        ),
       );
     }
+
     final auth = context.watch<AuthProvider>();
     return auth.isAuthenticated ? const HomeScreen() : const LoginScreen();
   }
